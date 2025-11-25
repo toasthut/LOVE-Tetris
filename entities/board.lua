@@ -13,7 +13,6 @@ function Board:new()
 	self.cols = 10
 	self.rows = 20
 
-	self.gridMatrix = {}
 	self:initGrid()
 
 	self.activePiece = Tetronimo.random()
@@ -23,7 +22,17 @@ function Board:new()
 	return self
 end
 
+---@param func function
+function Board:forGrid(func)
+	for i = 1, self.rows do
+		for j = 1, self.cols do
+			func(i, j)
+		end
+	end
+end
+
 function Board:initGrid()
+	self.gridMatrix = {}
 	self:forGrid(function(i, j)
 		if not self.gridMatrix[j] then
 			self.gridMatrix[j] = {}
@@ -107,15 +116,6 @@ end
 
 function Board:getHeight()
 	return self.rows * CELL_SIZE
-end
-
----@param func function
-function Board:forGrid(func)
-	for i = 1, self.rows do
-		for j = 1, self.cols do
-			func(i, j)
-		end
-	end
 end
 
 function Board:getActiveCells()
