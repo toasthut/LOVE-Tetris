@@ -34,10 +34,14 @@ local ShapeMatrices = {
 }
 
 ---@class Tetronimo: Entity
+---@field shape string
+---@field matrix number[][]
+---@field color table
 local Tetronimo = Entity:extend()
+Tetronimo.super = Entity
 
+---@param shape string
 function Tetronimo:new(shape)
-	---@diagnostic disable-next-line: undefined-field
 	Tetronimo.super.new(self, 0, 0)
 	self.shape = shape
 	self.matrix = ShapeMatrices[shape]
@@ -59,6 +63,10 @@ end
 
 function Tetronimo:getGridPosition()
 	return self.x / CELL_SIZE + 1, self.y / CELL_SIZE + 1
+end
+
+function Tetronimo:setGridPosition(x, y)
+	self:setPosition(x * CELL_SIZE, y * CELL_SIZE)
 end
 
 ---@alias direction

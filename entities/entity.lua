@@ -1,4 +1,6 @@
 ---@class Entity: Object
+---@field x number
+---@field y number
 local Entity = Object:extend()
 
 ---@param x number

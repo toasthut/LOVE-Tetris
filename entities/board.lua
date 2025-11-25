@@ -3,22 +3,26 @@ local Tetronimo = require("entities.tetronimo")
 local CELL_SIZE = require("constants").CELL_SIZE
 
 ---@class Board: Entity
+---@field cols number
+---@field rows number
 ---@field gridMatrix number[][]
+---@field activePiece Tetronimo
+---@field fallDelay number
+---@field fallTimer number
 local Board = Entity:extend()
+Board.super = Entity
 
 ---@return Board
 function Board:new()
-	---@diagnostic disable-next-line: undefined-field
 	Board.super.new(self, 0, 0)
 	self.cols = 10
 	self.rows = 20
 
 	self:initGrid()
 
-	self.activePiece = Tetronimo.random()
+	self:spawnPiece(Tetronimo.random())
 	self.fallDelay = 3
 	self.fallTimer = 0
-
 	return self
 end
 
@@ -41,6 +45,12 @@ function Board:initGrid()
 	end)
 end
 
+function Board:spawnPiece(tetronimo)
+	self.activePiece = tetronimo
+	local x = (self.cols / 2) - 2
+	self.activePiece:setGridPosition(x, 0)
+end
+
 function Board:clearLast()
 	self:forGrid(function(i, j)
 		if self.gridMatrix[j][i] == 1 then
@@ -50,6 +60,7 @@ function Board:clearLast()
 end
 
 function Board:update(dt)
+	-- If timer exceeds fall delay, remove delay from timer and execute fall logic
 	self.fallTimer = self.fallTimer + 10 * dt
 	if self.fallTimer >= self.fallDelay then
 		self.fallTimer = self.fallTimer - self.fallDelay
@@ -58,22 +69,24 @@ function Board:update(dt)
 			local cells = self:getActiveCells()
 			for _, cell in ipairs(cells) do
 				self.gridMatrix[cell.x][cell.y] = 2
-				self.activePiece = Tetronimo.random()
+				self:spawnPiece(Tetronimo.random())
 			end
 		end
 	end
 
+	--[[
 	-- Update grid matrix
 	self:clearLast()
 	for _, cell in ipairs(self:getActiveCells()) do
 		self.gridMatrix[cell.x][cell.y] = 1
 	end
+	--]]
 end
 
 function Board:draw()
 	love.graphics.push()
 	love.graphics.translate(self.x, self.y)
-	local left, right, top, bottom = self:getSides()
+	local left, right, top, bottom = 0, self:getWidth(), 0, self:getHeight()
 
 	-- Draw grid
 	love.graphics.setColor(0.2, 0.2, 0.2, 1)
@@ -106,8 +119,23 @@ function Board:draw()
 	love.graphics.pop()
 end
 
-function Board:getSides()
-	return 0, self:getWidth(), 0, self:getHeight()
+---@param key love.KeyConstant
+function Board:keypressed(key)
+	if key == "left" then
+		self:moveActive("Left")
+	elseif key == "right" then
+		self:moveActive("Right")
+	end
+
+	if key == "up" then
+		self.fallTimer = self.fallDelay
+		local moved = true
+		while moved do
+			moved = self:moveActive("Down")
+		end
+	elseif key == "down" then
+		self:moveActive("Down")
+	end
 end
 
 function Board:getWidth()
@@ -134,6 +162,7 @@ function Board:getActiveCells()
 	return cells
 end
 
+---@param dir direction
 function Board:checkMove(dir)
 	local activeCells = self:getActiveCells()
 	for _, cell in ipairs(activeCells) do
@@ -152,13 +181,14 @@ function Board:checkMove(dir)
 			return false
 		end
 		-- Check if position is not empty
-		if self.gridMatrix[x][y] > 1 then
+		if self.gridMatrix[x][y] ~= 0 then
 			return false
 		end
 	end
 	return true
 end
 
+---@param dir direction
 function Board:moveActive(dir)
 	local canMove = self:checkMove(dir)
 	if canMove then

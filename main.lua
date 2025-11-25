@@ -5,15 +5,17 @@ Object = require("classic")
 util = require("haert.util")
 switch = util.switch
 
----@type Logger
-Log = require("logger")()
 local Board = require("entities.board")
 
+---@type Logger
+Log = require("logger")()
+
 ---@type Board
-local board = Board()
+local board
 
 function love.load()
 	Log:print("game loaded")
+	board = Board()
 
 	-- Center board in window
 	board:setPosition(
@@ -34,18 +36,13 @@ end
 
 ---@param key love.KeyConstant
 function love.keypressed(key)
+	board:keypressed(key)
 	if key == "`" then
 		Log:toggleVisibility()
 	end
 
-	if key == "left" then
-		board:moveActive("Left")
-	elseif key == "right" then
-		board:moveActive("Right")
-	end
-
-	if key == "down" then
-		board:moveActive("Down")
+	if key == "r" then
+		love.load()
 	end
 
 	if key == "p" then
