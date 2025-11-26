@@ -157,11 +157,9 @@ function Board:keypressed(key)
 	end
 
 	if key == "x" then
-		local rotated = self.activePiece:getRotation("Clockwise")
-		self.activePiece:setMatrix(rotated)
+		self.activePiece.matrix:rotate("Clockwise")
 	elseif key == "z" then
-		local rotated = self.activePiece:getRotation("CounterClockwise")
-		self.activePiece:setMatrix(rotated)
+		self.activePiece.matrix:rotate("CounterClockwise")
 	end
 end
 
@@ -177,15 +175,14 @@ function Board:getActiveCells()
 	local cells = {}
 	local t = self.activePiece
 	local tx, ty = t:getGridPosition()
-	for i, row in ipairs(t:getMatrix()) do
-		for j, v in ipairs(row) do
-			if v == 1 then
-				local x = tx + j - 1
-				local y = ty + i - 1
-				table.insert(cells, { x = x, y = y })
-			end
+
+	t.matrix:forEach(function(mx, my, v)
+		if v == State.FULL then
+			local x = tx + mx - 1
+			local y = ty + my - 1
+			table.insert(cells, { x = x, y = y })
 		end
-	end
+	end)
 	return cells
 end
 
