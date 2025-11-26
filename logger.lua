@@ -18,6 +18,7 @@ function Logger:draw()
 	for i, v in ipairs(self.msgs) do
 		-- Print msgs from bottom of screen upwards
 		local height = love.graphics:getHeight() - 5 - (15 * i)
+
 		-- Reduce text opacity for older messages
 		local color = self.color
 		local opacityReduction = 7
@@ -32,22 +33,22 @@ end
 
 function Logger:print(msg)
 	local text = ""
+	local timestamp = os.clock()
 
+	-- Special formatting for tables
 	if type(msg) == "table" then
-		text = "{"
-		for i, v in pairs(msg) do
-			text = text .. v
-			if i ~= #msg then
-				text = text .. ", "
-			end
+		local tmp = {}
+		for _, v in pairs(msg) do
+			table.insert(tmp, v)
 		end
-		text = text .. "}"
+		text = string.format("{%s}", table.concat(tmp, ","))
 	else
 		text = msg
 	end
 
-	print(text)
-	table.insert(self.msgs, 1, text)
+	local fulltext = string.format("%.3f: %s", timestamp, tostring(text))
+	print(fulltext)
+	table.insert(self.msgs, 1, fulltext)
 	if #self.msgs > self.maxMsgs then
 		table.remove(self.msgs, #self.msgs)
 	end

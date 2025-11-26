@@ -97,7 +97,7 @@ function Board:update(dt)
 	-- Update grid matrix
 	self:clearLast()
 	for _, cell in ipairs(self:getActiveCells()) do
-		self.gridMatrix[cell.x][cell.y] = 1
+		self.gridMatrix[cell.y][cell.x] = 1
 	end
 	--]]
 end

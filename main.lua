@@ -14,6 +14,7 @@ Log = require("logger")()
 local board
 
 function love.load()
+	Log:clear()
 	Log:print("game loaded")
 	board = Board()
 
