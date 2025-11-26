@@ -45,6 +45,10 @@ function love.keypressed(key)
 		love.load()
 	end
 
+	if key == "q" then
+		love.event.quit()
+	end
+
 	if key == "p" then
 		local activeCells = board:getActiveCells()
 		for _, v in pairs(activeCells) do

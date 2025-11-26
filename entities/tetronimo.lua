@@ -5,31 +5,31 @@ local CELL_SIZE = require("constants").CELL_SIZE
 local ShapeMatrices = {
 	I = {
 		{ 1, 1, 1, 1 },
-		{ 0, 0, 0, 0 },
 	},
 	O = {
-		{ 1, 1, 0, 0 },
-		{ 1, 1, 0, 0 },
+		{ 1, 1 },
+		{ 1, 1 },
 	},
 	S = {
-		{ 0, 1, 1, 0 },
-		{ 1, 1, 0, 0 },
+		{ 0, 1, 1 },
+		{ 1, 1, 0 },
 	},
 	Z = {
-		{ 1, 1, 0, 0 },
-		{ 0, 1, 1, 0 },
+		{ 1, 1, 0 },
+		{ 0, 1, 1 },
 	},
 	L = {
-		{ 0, 0, 1, 0 },
-		{ 1, 1, 1, 0 },
+		{ 0, 0, 1 },
+		{ 1, 1, 1 },
 	},
 	J = {
-		{ 1, 0, 0, 0 },
-		{ 1, 1, 1, 0 },
+		{ 1, 0, 0 },
+		{ 1, 1, 1 },
 	},
 	T = {
-		{ 0, 1, 0, 0 },
-		{ 1, 1, 1, 0 },
+		{ 0, 1, 0 },
+		{ 1, 1, 1 },
+		{ 0, 0, 0 },
 	},
 }
 
@@ -69,6 +69,14 @@ function Tetronimo:setGridPosition(x, y)
 	self:setPosition(x * CELL_SIZE, y * CELL_SIZE)
 end
 
+function Tetronimo:getMatrix()
+	return self.matrix
+end
+
+function Tetronimo:setMatrix(matrix)
+	self.matrix = matrix
+end
+
 ---@alias direction
 ---| "Left"
 ---| "Right"
@@ -90,8 +98,36 @@ function Tetronimo:move(dir, num)
 	})
 end
 
-function Tetronimo:getMatrix()
-	return self.matrix
+---@alias rotation
+---| "Clockwise"
+---| "CounterClockwise"
+---@param rot rotation
+function Tetronimo:getRotation(rot)
+	local matrix = self:getMatrix()
+	local rotatedMatrix = {}
+
+	-- Initialize rotated matrix
+	for i = 1, #matrix[1] do
+		rotatedMatrix[i] = {}
+		for j = 1, #matrix do
+			rotatedMatrix[i][j] = 0
+		end
+	end
+
+	for my = 1, #matrix do
+		for mx = 1, #matrix[my] do
+			if rot == "Clockwise" then
+				local y = mx
+				local x = #matrix - (my - 1)
+				rotatedMatrix[y][x] = matrix[my][mx]
+			elseif rot == "CounterClockwise" then
+				local y = #matrix[my] - (mx - 1)
+				local x = my
+				rotatedMatrix[y][x] = matrix[my][mx]
+			end
+		end
+	end
+	return rotatedMatrix
 end
 
 ---@return Tetronimo
