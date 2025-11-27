@@ -17,16 +17,15 @@ function love.load()
 	Log:clear()
 	Log:print("game loaded")
 	board = Board()
+end
 
+---@param dt number
+function love.update(dt)
 	-- Center board in window
 	board:setPosition(
 		love.graphics.getWidth() / 2 - board:getWidth() / 2,
 		love.graphics.getHeight() / 2 - board:getHeight() / 2
 	)
-end
-
----@param dt number
-function love.update(dt)
 	board:update(dt)
 end
 

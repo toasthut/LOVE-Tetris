@@ -1,5 +1,4 @@
-local Entity = require("entities.entity")
-local Matrix = require("matrix")
+local Matrix = require("entities.matrix")
 local CELL_SIZE = require("constants").CELL_SIZE
 
 ---@enum ShapeMatrices
@@ -34,23 +33,23 @@ local ShapeMatrices = {
 	},
 }
 
----@class Tetronimo: Entity
+---@class Tetronimo: Matrix
 ---@field shape string
----@field matrix Matrix
 ---@field color table
-local Tetronimo = Entity:extend()
-Tetronimo.super = Entity
+local Tetronimo = Matrix:extend()
+Tetronimo.super = Matrix
 
 ---@param shape string
 function Tetronimo:new(shape)
-	Tetronimo.super.new(self, 0, 0)
+	local matrix = Matrix.fromTable(ShapeMatrices[shape])
+	Tetronimo.super.new(self, matrix.rows, matrix.cols, 0)
+	self.matrix = matrix.matrix
 	self.shape = shape
-	self.matrix = Matrix.fromTable(ShapeMatrices[shape])
 	self.color = { 1, 1, 1, 1 }
 end
 
 function Tetronimo:draw()
-	self.matrix:forEach(function(mx, my, v)
+	self:forEach(function(mx, my, v)
 		if v == 1 then
 			local x = self.x + ((mx - 1) * CELL_SIZE)
 			local y = self.y + ((my - 1) * CELL_SIZE)
@@ -58,16 +57,6 @@ function Tetronimo:draw()
 			love.graphics.rectangle("fill", x, y, CELL_SIZE, CELL_SIZE)
 		end
 	end)
-	-- for i, row in ipairs(self.matrix) do
-	-- 	for j, v in ipairs(row) do
-	-- 		if v == 1 then
-	-- 			local x = self.x + ((j - 1) * CELL_SIZE)
-	-- 			local y = self.y + ((i - 1) * CELL_SIZE)
-	-- 			love.graphics.setColor(self.color)
-	-- 			love.graphics.rectangle("fill", x, y, CELL_SIZE, CELL_SIZE)
-	-- 		end
-	-- 	end
-	-- end
 end
 
 function Tetronimo:getGridPosition()

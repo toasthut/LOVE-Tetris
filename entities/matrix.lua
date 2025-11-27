@@ -1,5 +1,11 @@
----@class Matrix: Object
-local Matrix = Object:extend()
+local Entity = require("entities.entity")
+
+---@class Matrix: Entity
+---@field rows number
+---@field cols number
+---@field matrix number[][]
+local Matrix = Entity:extend()
+Matrix.super = Entity
 
 function Matrix.fromTable(table)
 	for i = 1, #table do
@@ -8,15 +14,19 @@ function Matrix.fromTable(table)
 	local rows = #table
 	local cols = #table[1]
 	---@type Matrix
-	local matrix = Matrix(rows, cols, 0)
-	matrix:forEach(function(x, y)
+	local m = Matrix(rows, cols, 0)
+	m:forEach(function(x, y)
 		local val = table[y][x]
-		matrix:setCell(x, y, val)
+		m:setCell(x, y, val)
 	end)
-	return matrix
+	return m
 end
 
+---@param rows number
+---@param cols number
+---@param initVal any
 function Matrix:new(rows, cols, initVal)
+	Matrix.super.new(self, 0, 0)
 	self.rows = rows
 	self.cols = cols
 	self.matrix = self:init(initVal)
@@ -39,7 +49,11 @@ function Matrix:getCell(x, y)
 end
 
 function Matrix:setCell(x, y, val)
-	self.matrix[y][x] = val
+	if x > 0 and x <= self.cols and y > 0 and y <= self.rows then
+		self.matrix[y][x] = val
+	else
+		error(string.format("Cell %d,%d is out of matrix range", x, y))
+	end
 end
 
 function Matrix:insertRow(pos, initVal)
@@ -57,10 +71,6 @@ end
 function Matrix:removeRow(pos)
 	table.remove(self.matrix, pos)
 	self.rows = self.rows - 1
-end
-
-function Matrix:setMatrix(matrix)
-	self.matrix = matrix
 end
 
 ---@param func function
@@ -112,6 +122,10 @@ end
 function Matrix:rotate(rot)
 	local rotated = self:getRotation(rot)
 	self.matrix = rotated
+
+	local tmp = self.rows
+	self.rows = self.cols
+	self.cols = tmp
 end
 
 return Matrix
