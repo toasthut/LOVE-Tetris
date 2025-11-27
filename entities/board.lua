@@ -108,6 +108,11 @@ function Board:keypressed(key)
 	elseif key == "z" then
 		self.activePiece:rotate("CounterClockwise")
 	end
+	if key == "s" then
+		self:rotate("Clockwise")
+	elseif key == "a" then
+		self:rotate("CounterClockwise")
+	end
 end
 
 function Board:getWidth()

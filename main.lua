@@ -32,6 +32,10 @@ end
 function love.draw()
 	board:draw()
 	Log:draw()
+
+	love.graphics.setColor(1, 1, 1, 1)
+	love.graphics.print("Arrow keys to move", 10, 10)
+	love.graphics.print("Z/X to rotate", 10, 25)
 end
 
 ---@param key love.KeyConstant

@@ -1,0 +1,4 @@
+name: LOVE-Tetris
+version: 0.0.1
+assets:
+  - "*.lua"
