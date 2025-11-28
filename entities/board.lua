@@ -1,4 +1,4 @@
-local Entity = require("entities.entity")
+local Matrix = require("entities.matrix")
 local Tetronimo = require("entities.tetronimo")
 local CELL_SIZE = require("constants").CELL_SIZE
 
@@ -8,72 +8,26 @@ local State = {
 	FULL = 1,
 }
 
----@class Board: Entity
----@field cols number
----@field rows number
----@field gridMatrix number[][]
+---@class Board: Matrix
 ---@field activePiece Tetronimo
 ---@field fallDelay number
 ---@field fallTimer number
-local Board = Entity:extend()
-Board.super = Entity
+local Board = Matrix:extend()
+Board.super = Matrix
 
 ---@return Board
 function Board:new()
-	Board.super.new(self, 0, 0)
-	self.cols = 10
-	self.rows = 20
-
-	self.gridMatrix = self:initGrid()
-
+	Board.super.new(self, 20, 10, 0)
 	self:spawnPiece(Tetronimo("T"))
 	self.fallDelay = 6
 	self.fallTimer = 0
 	return self
 end
 
----@param func function
-function Board:forMatrix(func)
-	for my = 1, self.rows do
-		for mx = 1, self.cols do
-			func(my, mx)
-		end
-	end
-end
-
-function Board:initGrid()
-	local matrix = {}
-	self:forMatrix(function(my, mx)
-		if not matrix[my] then
-			matrix[my] = {}
-		end
-		matrix[my][mx] = 0
-	end)
-	Log:print("grid height: " .. #matrix)
-	Log:print("grid width: " .. #matrix[1])
-	return matrix
-end
-
-function Board:initRow()
-	local row = {}
-	for i = 1, self.cols do
-		row[i] = 0
-	end
-	return row
-end
-
 function Board:spawnPiece(tetronimo)
 	self.activePiece = tetronimo
-	local x = (self.cols / 2) - 2
-	self.activePiece:setGridPosition(x, 0)
-end
-
-function Board:clearLast()
-	self:forMatrix(function(my, mx)
-		if self.gridMatrix[my][mx] == 1 then
-			self.gridMatrix[my][mx] = 0
-		end
-	end)
+	local x = (self.cols / 2) - 1
+	self.activePiece:setGridPosition(x, 1)
 end
 
 function Board:update(dt)
@@ -83,23 +37,15 @@ function Board:update(dt)
 		self.fallTimer = self.fallTimer - self.fallDelay
 		local canMove = self:moveActive("Down")
 		if not canMove then
-			local cells = self:getActiveCells()
+			local cells = self:getActiveCells(self.activePiece)
 			for _, cell in ipairs(cells) do
-				self.gridMatrix[cell.y][cell.x] = State.FULL
+				pcall(self.setCell, self, cell.x, cell.y, State.FULL)
 				self:spawnPiece(Tetronimo.random())
 			end
 		end
 	end
 
 	self:clearFullLines()
-
-	--[[
-	-- Update grid matrix
-	self:clearLast()
-	for _, cell in ipairs(self:getActiveCells()) do
-		self.gridMatrix[cell.y][cell.x] = 1
-	end
-	--]]
 end
 
 function Board:draw()
@@ -109,7 +55,7 @@ function Board:draw()
 
 	-- Draw grid
 	love.graphics.setColor(0.2, 0.2, 0.2, 1)
-	self:forMatrix(function(my, mx)
+	self:forEach(function(mx, my)
 		local x = (mx - 1) * CELL_SIZE
 		local y = (my - 1) * CELL_SIZE
 		love.graphics.rectangle("line", x, y, CELL_SIZE, CELL_SIZE)
@@ -117,10 +63,10 @@ function Board:draw()
 	end)
 
 	-- Draw filled cells
-	self:forMatrix(function(my, mx)
+	self:forEach(function(mx, my, v)
 		local x = (mx - 1) * CELL_SIZE
 		local y = (my - 1) * CELL_SIZE
-		if self.gridMatrix[my][mx] == State.FULL then
+		if v == State.FULL then
 			love.graphics.setColor(0.35, 0.35, 1, 1)
 			love.graphics.rectangle("fill", x, y, CELL_SIZE, CELL_SIZE)
 		end
@@ -138,33 +84,6 @@ function Board:draw()
 	love.graphics.pop()
 end
 
----@param key love.KeyConstant
-function Board:keypressed(key)
-	if key == "left" then
-		self:moveActive("Left")
-	elseif key == "right" then
-		self:moveActive("Right")
-	end
-
-	if key == "up" then
-		self.fallTimer = self.fallDelay
-		local moved = true
-		while moved do
-			moved = self:moveActive("Down")
-		end
-	elseif key == "down" then
-		self:moveActive("Down")
-	end
-
-	if key == "x" then
-		local rotated = self.activePiece:getRotation("Clockwise")
-		self.activePiece:setMatrix(rotated)
-	elseif key == "z" then
-		local rotated = self.activePiece:getRotation("CounterClockwise")
-		self.activePiece:setMatrix(rotated)
-	end
-end
-
 function Board:getWidth()
 	return self.cols * CELL_SIZE
 end
@@ -173,25 +92,25 @@ function Board:getHeight()
 	return self.rows * CELL_SIZE
 end
 
-function Board:getActiveCells()
-	local cells = {}
-	local t = self.activePiece
+---@param t Tetronimo
+function Board:getActiveCells(t)
 	local tx, ty = t:getGridPosition()
-	for i, row in ipairs(t:getMatrix()) do
-		for j, v in ipairs(row) do
-			if v == 1 then
-				local x = tx + j - 1
-				local y = ty + i - 1
-				table.insert(cells, { x = x, y = y })
-			end
+
+	local cells = t:map(function(mx, my, v)
+		if v == State.FULL then
+			local x = tx + mx - 1
+			local y = ty + my - 1
+			return { x = x, y = y }
 		end
-	end
+	end)
+
 	return cells
 end
 
 ---@param dir direction
-function Board:checkMove(dir)
-	local activeCells = self:getActiveCells()
+---@param t Tetronimo
+function Board:checkMove(dir, t)
+	local activeCells = self:getActiveCells(t)
 	for _, cell in ipairs(activeCells) do
 		-- Process position to move to
 		local x, y = cell.x, cell.y
@@ -208,7 +127,7 @@ function Board:checkMove(dir)
 			return false
 		end
 		-- Check if position is not empty
-		if self.gridMatrix[y][x] ~= 0 then
+		if self:getCell(x, y) ~= 0 then
 			return false
 		end
 	end
@@ -217,33 +136,52 @@ end
 
 ---@param dir direction
 function Board:moveActive(dir)
-	local canMove = self:checkMove(dir)
+	local canMove = self:checkMove(dir, self.activePiece)
 	if canMove then
 		self.activePiece:move(dir)
 	end
 	return canMove
 end
 
+---@param rot rotation
+function Board:checkRotation(rot)
+	local t = self.activePiece
+	local testPiece = t:copy()
+	testPiece:rotate(rot)
+
+	local activeCells = self:getActiveCells(testPiece)
+
+	for _, cell in ipairs(activeCells) do
+		local state = self:getCell(cell.x, cell.y)
+		-- DEBUG
+		-- Log:print(cell)
+		if state == nil then
+			return false
+		elseif state ~= State.EMPTY or cell.x > self.cols or cell.x < 1 or cell.y > self.rows or cell.y < 1 then
+			-- if state == State.FULL or state == nil then
+			return false
+		end
+	end
+	return true
+end
+
 function Board:clearFullLines()
 	local isFull = false
-	local matrix = self.gridMatrix
 
-	for my = 1, #matrix do
-		for mx = 1, #matrix[my] do
-			isFull = self.gridMatrix[my][mx] == State.FULL
+	for my = 1, #self.matrix do
+		for mx = 1, #self.matrix[my] do
+			isFull = self:getCell(mx, my) == State.FULL
 			if not isFull then
 				break
 			end
 		end
 		if isFull then
 			Log:print(string.format("Line #%d is full", my))
-			table.remove(matrix, my)
-			table.insert(matrix, 1, self:initRow())
+			self:removeRow(my)
+			self:insertRow(1, 0)
 			isFull = false
 		end
 	end
-
-	self.gridMatrix = matrix
 end
 
 return Board

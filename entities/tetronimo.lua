@@ -1,4 +1,4 @@
-local Entity = require("entities.entity")
+local Matrix = require("entities.matrix")
 local CELL_SIZE = require("constants").CELL_SIZE
 
 ---@enum ShapeMatrices
@@ -33,48 +33,62 @@ local ShapeMatrices = {
 	},
 }
 
----@class Tetronimo: Entity
+---@class Tetronimo: Matrix
 ---@field shape string
----@field matrix number[][]
 ---@field color table
-local Tetronimo = Entity:extend()
-Tetronimo.super = Entity
+local Tetronimo = Matrix:extend()
+Tetronimo.super = Matrix
 
 ---@param shape string
 function Tetronimo:new(shape)
-	Tetronimo.super.new(self, 0, 0)
+	local matrix = Matrix.fromTable(ShapeMatrices[shape])
+	Tetronimo.super.new(self, matrix.rows, matrix.cols, 0)
+	self.matrix = matrix.matrix
 	self.shape = shape
-	self.matrix = ShapeMatrices[shape]
 	self.color = { 1, 1, 1, 1 }
 end
 
-function Tetronimo:draw()
-	for i, row in ipairs(self.matrix) do
-		for j, v in ipairs(row) do
-			if v == 1 then
-				local x = self.x + ((j - 1) * CELL_SIZE)
-				local y = self.y + ((i - 1) * CELL_SIZE)
-				love.graphics.setColor(self.color)
-				love.graphics.rectangle("fill", x, y, CELL_SIZE, CELL_SIZE)
-			end
-		end
-	end
+function Tetronimo:copy()
+	---@type Tetronimo
+	local t = Tetronimo("T")
+
+	---@type Matrix
+	local matrix = self.super.copy(self)
+	t.x = matrix.x
+	t.y = matrix.y
+	t.rows = matrix.rows
+	t.cols = matrix.cols
+	t.matrix = matrix.matrix
+
+	return t
+end
+function Tetronimo.fromTable(table)
+	local matrix = Matrix.fromTable(table)
+	local t = Tetronimo("T")
+	t.matrix = matrix
+	t.shape = "?"
 end
 
+function Tetronimo:draw()
+	self:forEach(function(mx, my, v)
+		if v == 1 then
+			local x = self.x + ((mx - 1) * CELL_SIZE)
+			local y = self.y + ((my - 1) * CELL_SIZE)
+			love.graphics.setColor(self.color)
+			love.graphics.rectangle("fill", x, y, CELL_SIZE, CELL_SIZE)
+		end
+	end)
+end
+
+---@return number, number
 function Tetronimo:getGridPosition()
 	return self.x / CELL_SIZE + 1, self.y / CELL_SIZE + 1
 end
 
 function Tetronimo:setGridPosition(x, y)
+	x = x - 1
+	y = y - 1
 	self:setPosition(x * CELL_SIZE, y * CELL_SIZE)
-end
-
-function Tetronimo:getMatrix()
-	return self.matrix
-end
-
-function Tetronimo:setMatrix(matrix)
-	self.matrix = matrix
 end
 
 ---@alias direction
@@ -96,38 +110,6 @@ function Tetronimo:move(dir, num)
 			self.y = self.y + CELL_SIZE * num
 		end,
 	})
-end
-
----@alias rotation
----| "Clockwise"
----| "CounterClockwise"
----@param rot rotation
-function Tetronimo:getRotation(rot)
-	local matrix = self:getMatrix()
-	local rotatedMatrix = {}
-
-	-- Initialize rotated matrix
-	for i = 1, #matrix[1] do
-		rotatedMatrix[i] = {}
-		for j = 1, #matrix do
-			rotatedMatrix[i][j] = 0
-		end
-	end
-
-	for my = 1, #matrix do
-		for mx = 1, #matrix[my] do
-			if rot == "Clockwise" then
-				local y = mx
-				local x = #matrix - (my - 1)
-				rotatedMatrix[y][x] = matrix[my][mx]
-			elseif rot == "CounterClockwise" then
-				local y = #matrix[my] - (mx - 1)
-				local x = my
-				rotatedMatrix[y][x] = matrix[my][mx]
-			end
-		end
-	end
-	return rotatedMatrix
 end
 
 ---@return Tetronimo
