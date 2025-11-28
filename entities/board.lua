@@ -26,8 +26,8 @@ end
 
 function Board:spawnPiece(tetronimo)
 	self.activePiece = tetronimo
-	local x = (self.cols / 2) - 2
-	self.activePiece:setGridPosition(x, 0)
+	local x = (self.cols / 2) - 1
+	self.activePiece:setGridPosition(x, 1)
 end
 
 function Board:update(dt)
@@ -37,7 +37,7 @@ function Board:update(dt)
 		self.fallTimer = self.fallTimer - self.fallDelay
 		local canMove = self:moveActive("Down")
 		if not canMove then
-			local cells = self:getActiveCells()
+			local cells = self:getActiveCells(self.activePiece)
 			for _, cell in ipairs(cells) do
 				pcall(self.setCell, self, cell.x, cell.y, State.FULL)
 				self:spawnPiece(Tetronimo.random())
@@ -84,37 +84,6 @@ function Board:draw()
 	love.graphics.pop()
 end
 
----@param key love.KeyConstant
-function Board:keypressed(key)
-	if key == "left" then
-		self:moveActive("Left")
-	elseif key == "right" then
-		self:moveActive("Right")
-	end
-
-	if key == "up" then
-		self.fallTimer = self.fallDelay
-		local moved = true
-		while moved do
-			moved = self:moveActive("Down")
-		end
-	elseif key == "down" then
-		self:moveActive("Down")
-		self.fallTimer = 0
-	end
-
-	if key == "x" then
-		self.activePiece:rotate("Clockwise")
-	elseif key == "z" then
-		self.activePiece:rotate("CounterClockwise")
-	end
-	if key == "s" then
-		self:rotate("Clockwise")
-	elseif key == "a" then
-		self:rotate("CounterClockwise")
-	end
-end
-
 function Board:getWidth()
 	return self.cols * CELL_SIZE
 end
@@ -123,24 +92,25 @@ function Board:getHeight()
 	return self.rows * CELL_SIZE
 end
 
-function Board:getActiveCells()
-	local cells = {}
-	local t = self.activePiece
+---@param t Tetronimo
+function Board:getActiveCells(t)
 	local tx, ty = t:getGridPosition()
 
-	t:forEach(function(mx, my, v)
+	local cells = t:map(function(mx, my, v)
 		if v == State.FULL then
 			local x = tx + mx - 1
 			local y = ty + my - 1
-			table.insert(cells, { x = x, y = y })
+			return { x = x, y = y }
 		end
 	end)
+
 	return cells
 end
 
 ---@param dir direction
-function Board:checkMove(dir)
-	local activeCells = self:getActiveCells()
+---@param t Tetronimo
+function Board:checkMove(dir, t)
+	local activeCells = self:getActiveCells(t)
 	for _, cell in ipairs(activeCells) do
 		-- Process position to move to
 		local x, y = cell.x, cell.y
@@ -166,11 +136,33 @@ end
 
 ---@param dir direction
 function Board:moveActive(dir)
-	local canMove = self:checkMove(dir)
+	local canMove = self:checkMove(dir, self.activePiece)
 	if canMove then
 		self.activePiece:move(dir)
 	end
 	return canMove
+end
+
+---@param rot rotation
+function Board:checkRotation(rot)
+	local t = self.activePiece
+	local testPiece = t:copy()
+	testPiece:rotate(rot)
+
+	local activeCells = self:getActiveCells(testPiece)
+
+	for _, cell in ipairs(activeCells) do
+		local state = self:getCell(cell.x, cell.y)
+		-- DEBUG
+		-- Log:print(cell)
+		if state == nil then
+			return false
+		elseif state ~= State.EMPTY or cell.x > self.cols or cell.x < 1 or cell.y > self.rows or cell.y < 1 then
+			-- if state == State.FULL or state == nil then
+			return false
+		end
+	end
+	return true
 end
 
 function Board:clearFullLines()

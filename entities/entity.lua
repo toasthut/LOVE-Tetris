@@ -10,6 +10,12 @@ function Entity:new(x, y)
 	self.y = y
 end
 
+function Entity:copy()
+	---@type Entity
+	local e = Entity(self.x, self.y)
+	return e
+end
+
 ---@param dt number
 ---@diagnostic disable-next-line: unused-local
 function Entity:update(dt) end

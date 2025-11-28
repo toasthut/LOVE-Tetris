@@ -44,8 +44,27 @@ function Matrix:init(initVal)
 	return matrix
 end
 
+function Matrix:copy()
+	---@type Matrix
+	local m = Matrix(self.rows, self.cols, 0)
+	m.x = self.x
+	m.y = self.y
+	self:forEach(function(x, y, v)
+		m:setCell(x, y, v)
+	end)
+	return m
+end
+
+function Matrix:isValidCell(x, y)
+	return x > 0 and x <= self.cols and y > 0 and y <= self.rows
+end
+
 function Matrix:getCell(x, y)
-	return self.matrix[y][x]
+	if self:isValidCell(x, y) then
+		return self.matrix[y][x]
+	else
+		return nil
+	end
 end
 
 function Matrix:setCell(x, y, val)
@@ -84,6 +103,17 @@ function Matrix:forEach(func)
 		end
 	end
 	return returnVal
+end
+
+---@param func function
+---@return Matrix
+function Matrix:map(func)
+	local mapped = {}
+	self:forEach(function(x, y, v)
+		local result = func(x, y, v)
+		table.insert(mapped, result)
+	end)
+	return mapped
 end
 
 ---@alias rotation

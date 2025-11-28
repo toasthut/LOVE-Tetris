@@ -48,6 +48,27 @@ function Tetronimo:new(shape)
 	self.color = { 1, 1, 1, 1 }
 end
 
+function Tetronimo:copy()
+	---@type Tetronimo
+	local t = Tetronimo("T")
+
+	---@type Matrix
+	local matrix = self.super.copy(self)
+	t.x = matrix.x
+	t.y = matrix.y
+	t.rows = matrix.rows
+	t.cols = matrix.cols
+	t.matrix = matrix.matrix
+
+	return t
+end
+function Tetronimo.fromTable(table)
+	local matrix = Matrix.fromTable(table)
+	local t = Tetronimo("T")
+	t.matrix = matrix
+	t.shape = "?"
+end
+
 function Tetronimo:draw()
 	self:forEach(function(mx, my, v)
 		if v == 1 then
@@ -59,11 +80,14 @@ function Tetronimo:draw()
 	end)
 end
 
+---@return number, number
 function Tetronimo:getGridPosition()
 	return self.x / CELL_SIZE + 1, self.y / CELL_SIZE + 1
 end
 
 function Tetronimo:setGridPosition(x, y)
+	x = x - 1
+	y = y - 1
 	self:setPosition(x * CELL_SIZE, y * CELL_SIZE)
 end
 
