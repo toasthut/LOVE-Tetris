@@ -26,21 +26,21 @@ function love.load()
 				return
 			end
 			board:moveActive("Left")
-		end),
+		end, true),
 
 		Keybind("right", function()
 			if love.keyboard.isDown("left") then
 				return
 			end
 			board:moveActive("Right")
-		end),
+		end, true),
 
 		Keybind("down", function()
 			local moved = board:moveActive("Down")
 			if moved then
 				board.fallTimer = 0
 			end
-		end),
+		end, 0, 18),
 
 		Keybind("up", function()
 			local moved = true
@@ -48,19 +48,19 @@ function love.load()
 			while moved do
 				moved = board:moveActive("Down")
 			end
-		end, false),
+		end),
 
 		Keybind("x", function()
 			if board:checkRotation("Clockwise") then
 				board.activePiece:rotate("Clockwise")
 			end
-		end, false),
+		end),
 
 		Keybind("z", function()
 			if board:checkRotation("CounterClockwise") then
 				board.activePiece:rotate("CounterClockwise")
 			end
-		end, false),
+		end),
 	}
 end
 
