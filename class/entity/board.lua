@@ -1,10 +1,14 @@
 local Matrix = require("class.entity.matrix")
-local Tetronimo = require("class.entity.tetronimo")
+local Tetronimo = require("class.entity.tetronimo").Tetronimo
+local GrabBag = require("class.entity.grabBag")
+
 local CellState = require("constants").CellState
 local CELL_SIZE = require("constants").CELL_SIZE
 
 ---@class Board: Matrix
+---@field grabBag GrabBag
 ---@field activePiece Tetronimo
+---@field holdPiece Tetronimo
 ---@field fallDelay number
 ---@field fallTimer number
 ---@field colorMatrix Matrix
@@ -13,10 +17,12 @@ Board.super = Matrix
 
 function Board:new()
 	Board.super.new(self, 20, 10, 0)
-	self:spawnPiece(Tetronimo("T"))
+	self.grabBag = GrabBag()
 	self.fallDelay = 6
 	self.fallTimer = 0
 	self.colorMatrix = Matrix(self.rows, self.cols, 0)
+	self:spawnPiece(self.grabBag:takePiece())
+	self.holdPiece = nil
 end
 
 ---@param tetronimo Tetronimo
@@ -42,7 +48,7 @@ function Board:update(dt)
 				pcall(self.setCell, self, cell.x, cell.y, CellState.FULL)
 				self.colorMatrix:setCell(cell.x, cell.y, self.activePiece.color)
 			end
-			self:spawnPiece(Tetronimo.random())
+			self:spawnPiece(self.grabBag:takePiece())
 		end
 	end
 
@@ -75,7 +81,8 @@ function Board:draw()
 		end
 	end)
 
-	-- Draw active piece
+	-- Draw active piece & ghost
+	self:getGhost():draw()
 	self.activePiece:draw()
 
 	-- Draw edges
@@ -83,6 +90,26 @@ function Board:draw()
 	love.graphics.line(left, top, left, bottom)
 	love.graphics.line(right, top, right, bottom)
 	love.graphics.line(left, bottom, right, bottom)
+
+	-- Draw held piece
+	love.graphics.push()
+	love.graphics.translate(-CELL_SIZE * 6.5, CELL_SIZE * 1)
+	love.graphics.print("HOLD", 0, -20)
+	local w = CELL_SIZE * 5.5
+	local h = CELL_SIZE * 3.5
+	love.graphics.rectangle("line", 0, 0, w, h)
+	if self.holdPiece ~= nil then
+		local t = self.holdPiece
+		local x = (w / 2) - (t.cols * CELL_SIZE / 2)
+		local y = (h / 2) - (t.rows * CELL_SIZE / 2)
+		t:setPosition(x, y)
+		t:draw()
+	end
+	love.graphics.pop()
+
+	-- Draw next pieces
+	love.graphics.translate(self:getWidth() + CELL_SIZE * 1.5, 0)
+	self.grabBag:draw()
 
 	love.graphics.pop()
 end
@@ -167,6 +194,34 @@ function Board:clearFullLines()
 			isFull = false
 		end
 	end
+end
+
+function Board:getGhost()
+	local ghost = self.activePiece:copy()
+	local nLoops = 0
+	repeat
+		local canMove = self:checkMove("Down", ghost)
+		if canMove then
+			ghost:move("Down")
+		end
+		nLoops = nLoops + 1
+		assert(nLoops < 1000, "Infinite loop stopped.")
+	until not canMove
+
+	ghost.color = util.hexToRGB("666666")
+	ghost.color[4] = 0.8
+	return ghost
+end
+
+function Board:swapHoldPiece()
+	local nextPiece
+	if self.holdPiece ~= nil then
+		nextPiece = Tetronimo(self.holdPiece.shape)
+	else
+		nextPiece = self.grabBag:takePiece()
+	end
+	self.holdPiece = Tetronimo(self.activePiece.shape)
+	self:spawnPiece(nextPiece)
 end
 
 return Board

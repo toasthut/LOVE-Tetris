@@ -73,7 +73,7 @@ end
 
 function Tetronimo:copy()
 	---@type Tetronimo
-	local t = Tetronimo("T")
+	local t = Tetronimo(self.shape)
 	---@type Matrix
 	local matrix = self.super.copy(self)
 
@@ -82,7 +82,11 @@ function Tetronimo:copy()
 	t.rows = matrix.rows
 	t.cols = matrix.cols
 	t.matrix = matrix.matrix
-	t.shape = self.shape
+
+	t.color = {}
+	for i = 1, #self.color do
+		t.color[i] = self.color[i]
+	end
 
 	return t
 end
@@ -151,4 +155,7 @@ function Tetronimo.random()
 	return Tetronimo(keys[i])
 end
 
-return Tetronimo
+return {
+	Tetronimo = Tetronimo,
+	TetShapes = TetShapes,
+}
