@@ -5,11 +5,11 @@ Object = require("classic")
 util = require("haert.util")
 switch = util.switch
 
-local Board = require("entities.board")
-local Keybind = require("keybind")
+local Board = require("class.entity.board")
+local Keybind = require("class.keybind")
 
 ---@type Logger
-Log = require("logger")()
+Log = require("class.logger")()
 
 ---@type Board
 local board

@@ -1,4 +1,4 @@
-local Entity = require("entities.entity")
+local Entity = require("class.entity.entity")
 
 ---@class Rectangle: Entity
 local Rectangle = Entity:extend()

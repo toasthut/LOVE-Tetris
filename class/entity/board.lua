@@ -1,5 +1,5 @@
-local Matrix = require("entities.matrix")
-local Tetronimo = require("entities.tetronimo")
+local Matrix = require("class.entity.matrix")
+local Tetronimo = require("class.entity.tetronimo")
 local CellState = require("constants").CellState
 local CELL_SIZE = require("constants").CELL_SIZE
 
@@ -7,16 +7,16 @@ local CELL_SIZE = require("constants").CELL_SIZE
 ---@field activePiece Tetronimo
 ---@field fallDelay number
 ---@field fallTimer number
+---@field colorMatrix Matrix
 local Board = Matrix:extend()
 Board.super = Matrix
 
----@return Board
 function Board:new()
 	Board.super.new(self, 20, 10, 0)
 	self:spawnPiece(Tetronimo("T"))
 	self.fallDelay = 6
 	self.fallTimer = 0
-	return self
+	self.colorMatrix = Matrix(self.rows, self.cols, 0)
 end
 
 ---@param tetronimo Tetronimo
@@ -35,12 +35,14 @@ function Board:update(dt)
 	if self.fallTimer >= self.fallDelay then
 		self.fallTimer = self.fallTimer - self.fallDelay
 		local canMove = self:moveActive("Down")
+
 		if not canMove then
 			local cells = self.activePiece:getFullCells()
 			for _, cell in ipairs(cells) do
 				pcall(self.setCell, self, cell.x, cell.y, CellState.FULL)
-				self:spawnPiece(Tetronimo.random())
+				self.colorMatrix:setCell(cell.x, cell.y, self.activePiece.color)
 			end
+			self:spawnPiece(Tetronimo.random())
 		end
 	end
 
@@ -66,7 +68,9 @@ function Board:draw()
 		local x = (mx - 1) * CELL_SIZE
 		local y = (my - 1) * CELL_SIZE
 		if v == CellState.FULL then
-			love.graphics.setColor(0.35, 0.35, 1, 1)
+			local color = self.colorMatrix:getCell(mx, my)
+			assert(type(color) == "table", string.format("Color matrix value at {%d,%d} is not a table", mx, my))
+			love.graphics.setColor(color)
 			love.graphics.rectangle("fill", x, y, CELL_SIZE, CELL_SIZE)
 		end
 	end)
@@ -158,6 +162,8 @@ function Board:clearFullLines()
 			Log:print(string.format("Line #%d is full", my))
 			self:removeRow(my)
 			self:insertRow(1, 0)
+			self.colorMatrix:removeRow(my)
+			self.colorMatrix:insertRow(1, 0)
 			isFull = false
 		end
 	end

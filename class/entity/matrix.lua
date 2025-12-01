@@ -1,9 +1,9 @@
-local Entity = require("entities.entity")
+local Entity = require("class.entity.entity")
 
 ---@class Matrix: Entity
 ---@field rows number
 ---@field cols number
----@field matrix number[][]
+---@field matrix any[][]
 local Matrix = Entity:extend()
 Matrix.super = Entity
 

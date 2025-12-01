@@ -1,36 +1,57 @@
-local Matrix = require("entities.matrix")
+local Matrix = require("class.entity.matrix")
 local CellState = require("constants").CellState
 local CELL_SIZE = require("constants").CELL_SIZE
 
----@enum ShapeMatrices
-local ShapeMatrices = {
+---@enum TetShapes
+local TetShapes = {
 	I = {
-		{ 1, 1, 1, 1 },
+		shape = {
+			{ 1, 1, 1, 1 },
+		},
+		color = util.hexToRGB("00ffff"),
 	},
 	O = {
-		{ 1, 1 },
-		{ 1, 1 },
+		shape = {
+			{ 1, 1 },
+			{ 1, 1 },
+		},
+		color = util.hexToRGB("ffff00"),
 	},
 	S = {
-		{ 0, 1, 1 },
-		{ 1, 1, 0 },
+		shape = {
+			{ 0, 1, 1 },
+			{ 1, 1, 0 },
+		},
+		color = util.hexToRGB("00ff00"),
 	},
 	Z = {
-		{ 1, 1, 0 },
-		{ 0, 1, 1 },
+		shape = {
+			{ 1, 1, 0 },
+			{ 0, 1, 1 },
+		},
+		color = util.hexToRGB("ff0000"),
 	},
 	L = {
-		{ 0, 0, 1 },
-		{ 1, 1, 1 },
+		shape = {
+			{ 0, 0, 1 },
+			{ 1, 1, 1 },
+		},
+		color = util.hexToRGB("ffaa00"),
 	},
 	J = {
-		{ 1, 0, 0 },
-		{ 1, 1, 1 },
+		shape = {
+			{ 1, 0, 0 },
+			{ 1, 1, 1 },
+		},
+		color = util.hexToRGB("0000ff"),
 	},
 	T = {
-		{ 0, 1, 0 },
-		{ 1, 1, 1 },
-		{ 0, 0, 0 },
+		shape = {
+			{ 0, 1, 0 },
+			{ 1, 1, 1 },
+			{ 0, 0, 0 },
+		},
+		color = util.hexToRGB("9900ff"),
 	},
 }
 
@@ -42,24 +63,26 @@ Tetronimo.super = Matrix
 
 ---@param shape string
 function Tetronimo:new(shape)
-	local matrix = Matrix.fromTable(ShapeMatrices[shape])
+	local prefab = TetShapes[shape]
+	local matrix = Matrix.fromTable(prefab.shape)
 	Tetronimo.super.new(self, matrix.rows, matrix.cols, 0)
 	self.matrix = matrix.matrix
 	self.shape = shape
-	self.color = { 1, 1, 1, 1 }
+	self.color = prefab.color
 end
 
 function Tetronimo:copy()
 	---@type Tetronimo
 	local t = Tetronimo("T")
-
 	---@type Matrix
 	local matrix = self.super.copy(self)
+
 	t.x = matrix.x
 	t.y = matrix.y
 	t.rows = matrix.rows
 	t.cols = matrix.cols
 	t.matrix = matrix.matrix
+	t.shape = self.shape
 
 	return t
 end
@@ -123,7 +146,7 @@ end
 
 ---@return Tetronimo
 function Tetronimo.random()
-	local keys = util.keys(ShapeMatrices)
+	local keys = util.keys(TetShapes)
 	local i = love.math.random(1, #keys)
 	return Tetronimo(keys[i])
 end
