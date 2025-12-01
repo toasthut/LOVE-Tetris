@@ -5,16 +5,16 @@ Object = require("classic")
 util = require("haert.util")
 switch = util.switch
 
-local Board = require("entities.board")
-local Keybind = require("keybind")
+local Board = require("class.entity.board")
+local Keybind = require("class.keybind")
+local Logger = require("class.logger")
 
 ---@type Logger
-Log = require("logger")()
-
----@type Board
-local board
+Log = Logger()
 ---@type Keybind[]
 local keybinds = {}
+---@type Board
+local board
 
 function love.load()
 	Log:clear()
@@ -61,6 +61,10 @@ function love.load()
 				board.activePiece:rotate("CounterClockwise")
 			end
 		end),
+
+		Keybind("lshift", function()
+			board:swapHoldPiece()
+		end),
 	}
 end
 
@@ -77,13 +81,20 @@ function love.update(dt)
 	end
 end
 
+local controlsText = {
+	"Arrow keys to move",
+	"Z/X to rotate",
+	"LShift to hold",
+}
+
 function love.draw()
 	board:draw()
 	Log:draw()
 
 	love.graphics.setColor(1, 1, 1, 1)
-	love.graphics.print("Arrow keys to move", 10, 10)
-	love.graphics.print("Z/X to rotate", 10, 25)
+	for i = 1, #controlsText do
+		love.graphics.print(controlsText[i], 10, -5 + (i * 16))
+	end
 end
 
 ---@param key love.KeyConstant
@@ -105,7 +116,7 @@ function love.keypressed(key)
 	end
 
 	if key == "p" then
-		local activeCells = board:getActiveCells(board.activePiece)
+		local activeCells = board.activePiece:getFullCells()
 		for _, v in pairs(activeCells) do
 			Log:print(v)
 		end
