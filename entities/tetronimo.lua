@@ -1,4 +1,5 @@
 local Matrix = require("entities.matrix")
+local CellState = require("constants").CellState
 local CELL_SIZE = require("constants").CELL_SIZE
 
 ---@enum ShapeMatrices
@@ -62,12 +63,6 @@ function Tetronimo:copy()
 
 	return t
 end
-function Tetronimo.fromTable(table)
-	local matrix = Matrix.fromTable(table)
-	local t = Tetronimo("T")
-	t.matrix = matrix
-	t.shape = "?"
-end
 
 function Tetronimo:draw()
 	self:forEach(function(mx, my, v)
@@ -110,6 +105,20 @@ function Tetronimo:move(dir, num)
 			self.y = self.y + CELL_SIZE * num
 		end,
 	})
+end
+
+function Tetronimo:getFullCells()
+	local tx, ty = self:getGridPosition()
+
+	local cells = self:map(function(mx, my, v)
+		if v == CellState.FULL then
+			local x = tx + mx - 1
+			local y = ty + my - 1
+			return { x = x, y = y }
+		end
+	end)
+
+	return cells
 end
 
 ---@return Tetronimo

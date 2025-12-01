@@ -105,7 +105,7 @@ function love.keypressed(key)
 	end
 
 	if key == "p" then
-		local activeCells = board:getActiveCells(board.activePiece)
+		local activeCells = board.activePiece:getFullCells()
 		for _, v in pairs(activeCells) do
 			Log:print(v)
 		end

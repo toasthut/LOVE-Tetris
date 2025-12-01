@@ -1,6 +1,10 @@
 local CONST = {
 	CELL_SIZE = 24,
-	DEFAULT_DELAY = 0.22,
+	---@enum CellState
+	CellState = {
+		EMPTY = 0,
+		FULL = 1,
+	},
 }
 
 return CONST

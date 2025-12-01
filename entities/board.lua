@@ -1,12 +1,7 @@
 local Matrix = require("entities.matrix")
 local Tetronimo = require("entities.tetronimo")
+local CellState = require("constants").CellState
 local CELL_SIZE = require("constants").CELL_SIZE
-
----@enum State
-local State = {
-	EMPTY = 0,
-	FULL = 1,
-}
 
 ---@class Board: Matrix
 ---@field activePiece Tetronimo
@@ -24,9 +19,13 @@ function Board:new()
 	return self
 end
 
+---@param tetronimo Tetronimo
 function Board:spawnPiece(tetronimo)
 	self.activePiece = tetronimo
 	local x = (self.cols / 2) - 1
+	if self.activePiece.shape == "O" then
+		x = x + 1
+	end
 	self.activePiece:setGridPosition(x, 1)
 end
 
@@ -37,9 +36,9 @@ function Board:update(dt)
 		self.fallTimer = self.fallTimer - self.fallDelay
 		local canMove = self:moveActive("Down")
 		if not canMove then
-			local cells = self:getActiveCells(self.activePiece)
+			local cells = self.activePiece:getFullCells()
 			for _, cell in ipairs(cells) do
-				pcall(self.setCell, self, cell.x, cell.y, State.FULL)
+				pcall(self.setCell, self, cell.x, cell.y, CellState.FULL)
 				self:spawnPiece(Tetronimo.random())
 			end
 		end
@@ -66,7 +65,7 @@ function Board:draw()
 	self:forEach(function(mx, my, v)
 		local x = (mx - 1) * CELL_SIZE
 		local y = (my - 1) * CELL_SIZE
-		if v == State.FULL then
+		if v == CellState.FULL then
 			love.graphics.setColor(0.35, 0.35, 1, 1)
 			love.graphics.rectangle("fill", x, y, CELL_SIZE, CELL_SIZE)
 		end
@@ -92,25 +91,10 @@ function Board:getHeight()
 	return self.rows * CELL_SIZE
 end
 
----@param t Tetronimo
-function Board:getActiveCells(t)
-	local tx, ty = t:getGridPosition()
-
-	local cells = t:map(function(mx, my, v)
-		if v == State.FULL then
-			local x = tx + mx - 1
-			local y = ty + my - 1
-			return { x = x, y = y }
-		end
-	end)
-
-	return cells
-end
-
 ---@param dir direction
 ---@param t Tetronimo
 function Board:checkMove(dir, t)
-	local activeCells = self:getActiveCells(t)
+	local activeCells = t:getFullCells()
 	for _, cell in ipairs(activeCells) do
 		-- Process position to move to
 		local x, y = cell.x, cell.y
@@ -149,16 +133,11 @@ function Board:checkRotation(rot)
 	local testPiece = t:copy()
 	testPiece:rotate(rot)
 
-	local activeCells = self:getActiveCells(testPiece)
+	local activeCells = testPiece:getFullCells()
 
 	for _, cell in ipairs(activeCells) do
 		local state = self:getCell(cell.x, cell.y)
-		-- DEBUG
-		-- Log:print(cell)
-		if state == nil then
-			return false
-		elseif state ~= State.EMPTY or cell.x > self.cols or cell.x < 1 or cell.y > self.rows or cell.y < 1 then
-			-- if state == State.FULL or state == nil then
+		if state == CellState.FULL or state == nil then
 			return false
 		end
 	end
@@ -170,7 +149,7 @@ function Board:clearFullLines()
 
 	for my = 1, #self.matrix do
 		for mx = 1, #self.matrix[my] do
-			isFull = self:getCell(mx, my) == State.FULL
+			isFull = self:getCell(mx, my) == CellState.FULL
 			if not isFull then
 				break
 			end
