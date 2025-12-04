@@ -1,5 +1,5 @@
 local CONST = {
-	DEFAULT_DELAY = 0.25,
+	DEFAULT_DELAY = 0.19,
 	DEFAULT_FREQ = 30,
 }
 
@@ -35,6 +35,7 @@ function Keybind:new(key, func, delay, perSecond)
 	self._timeHeld = 0
 	self._repeatTimer = 0
 	self._wasDown = false
+	return self
 end
 
 function Keybind:update(dt)

@@ -29,7 +29,7 @@ function Matrix:new(rows, cols, initVal)
 	Matrix.super.new(self, 0, 0)
 	self.rows = rows
 	self.cols = cols
-	self.matrix = self:init(initVal)
+	self:init(initVal)
 end
 
 function Matrix:init(initVal)
@@ -41,7 +41,7 @@ function Matrix:init(initVal)
 			matrix[my][mx] = initVal
 		end
 	end
-	return matrix
+	self.matrix = matrix
 end
 
 function Matrix:copy()

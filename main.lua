@@ -3,7 +3,6 @@ io.stdout:setvbuf("no")
 ---@diagnostic disable: lowercase-global
 Object = require("classic")
 util = require("haert.util")
-switch = util.switch
 
 local Board = require("class.entity.board")
 local Keybind = require("class.keybind")
@@ -11,61 +10,71 @@ local Logger = require("class.logger")
 
 ---@type Logger
 Log = Logger()
----@type Keybind[]
-local keybinds = {}
+
 ---@type Board
-local board
+local board = Board()
+
+---@type Keybind[]
+local keybinds = {
+	Keybind("left", function()
+		if love.keyboard.isDown("right") then
+			return
+		end
+		board:moveActive("Left")
+	end, true),
+
+	Keybind("right", function()
+		if love.keyboard.isDown("left") then
+			return
+		end
+		board:moveActive("Right")
+	end, true),
+
+	Keybind("down", function()
+		local moved = board:moveActive("Down")
+		if moved then
+			board.fallInterval:reset()
+		end
+	end, 0, 40),
+
+	Keybind("up", function()
+		board.activePiece = board:getGhost()
+		board.fallInterval:forceTrigger()
+	end),
+
+	Keybind("x", function()
+		if board:checkRotation("Clockwise") then
+			board.activePiece:rotate("Clockwise")
+		end
+	end),
+
+	Keybind("z", function()
+		if board:checkRotation("CounterClockwise") then
+			board.activePiece:rotate("CounterClockwise")
+		end
+	end),
+
+	Keybind("lshift", function()
+		if board.canHold then
+			board:swapHoldPiece()
+			board.canHold = false
+		end
+	end),
+
+	Keybind("p", function()
+		board.nCleared = board.nCleared + 1
+		board:updateFallSpeed()
+	end, true),
+
+	Keybind("o", function()
+		board:init(0)
+	end),
+}
 
 function love.load()
 	Log:clear()
 	Log:print("game loaded")
-	board = Board()
-	keybinds = {
-		Keybind("left", function()
-			if love.keyboard.isDown("right") then
-				return
-			end
-			board:moveActive("Left")
-		end, true),
-
-		Keybind("right", function()
-			if love.keyboard.isDown("left") then
-				return
-			end
-			board:moveActive("Right")
-		end, true),
-
-		Keybind("down", function()
-			local moved = board:moveActive("Down")
-			if moved then
-				board.fallTimer = 0
-			end
-		end, 0, 18),
-
-		Keybind("up", function()
-			local moved = true
-			board.fallTimer = board.fallDelay
-			while moved do
-				moved = board:moveActive("Down")
-			end
-		end),
-
-		Keybind("x", function()
-			if board:checkRotation("Clockwise") then
-				board.activePiece:rotate("Clockwise")
-			end
-		end),
-
-		Keybind("z", function()
-			if board:checkRotation("CounterClockwise") then
-				board.activePiece:rotate("CounterClockwise")
-			end
-		end),
-
-		Keybind("lshift", function()
-			board:swapHoldPiece()
-		end),
-	}
+	board:new()
 end
 
 ---@param dt number
@@ -93,7 +102,7 @@ function love.draw()
 
 	love.graphics.setColor(1, 1, 1, 1)
 	for i = 1, #controlsText do
-		love.graphics.print(controlsText[i], 10, -5 + (i * 16))
+		love.graphics.print(controlsText[i], 10, 10 + 16 * (i - 1))
 	end
 end
 
@@ -113,12 +122,5 @@ function love.keypressed(key)
 
 	if key == "q" then
 		love.event.quit()
-	end
-
-	if key == "p" then
-		local activeCells = board.activePiece:getFullCells()
-		for _, v in pairs(activeCells) do
-			Log:print(v)
-		end
 	end
 end

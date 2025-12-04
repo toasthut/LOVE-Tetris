@@ -1,6 +1,6 @@
 local Matrix = require("class.entity.matrix")
-local CellState = require("constants").CellState
-local CELL_SIZE = require("constants").CELL_SIZE
+local Cell = require("class.cell")
+local PALETTE = require("constants").PALETTE
 
 ---@enum TetShapes
 local TetShapes = {
@@ -8,42 +8,42 @@ local TetShapes = {
 		shape = {
 			{ 1, 1, 1, 1 },
 		},
-		color = util.hexToRGB("00ffff"),
+		color = PALETTE.aqua,
 	},
 	O = {
 		shape = {
 			{ 1, 1 },
 			{ 1, 1 },
 		},
-		color = util.hexToRGB("ffff00"),
+		color = PALETTE.lemon,
 	},
 	S = {
 		shape = {
 			{ 0, 1, 1 },
 			{ 1, 1, 0 },
 		},
-		color = util.hexToRGB("00ff00"),
+		color = PALETTE.lime,
 	},
 	Z = {
 		shape = {
 			{ 1, 1, 0 },
 			{ 0, 1, 1 },
 		},
-		color = util.hexToRGB("ff0000"),
+		color = PALETTE.strawberry,
 	},
 	L = {
 		shape = {
 			{ 0, 0, 1 },
 			{ 1, 1, 1 },
 		},
-		color = util.hexToRGB("ffaa00"),
+		color = PALETTE.carrot,
 	},
 	J = {
 		shape = {
 			{ 1, 0, 0 },
 			{ 1, 1, 1 },
 		},
-		color = util.hexToRGB("0000ff"),
+		color = PALETTE.skyblue,
 	},
 	T = {
 		shape = {
@@ -51,7 +51,7 @@ local TetShapes = {
 			{ 1, 1, 1 },
 			{ 0, 0, 0 },
 		},
-		color = util.hexToRGB("9900ff"),
+		color = PALETTE.swell,
 	},
 }
 
@@ -94,23 +94,22 @@ end
 function Tetronimo:draw()
 	self:forEach(function(mx, my, v)
 		if v == 1 then
-			local x = self.x + ((mx - 1) * CELL_SIZE)
-			local y = self.y + ((my - 1) * CELL_SIZE)
-			love.graphics.setColor(self.color)
-			love.graphics.rectangle("fill", x, y, CELL_SIZE, CELL_SIZE)
+			local x = self.x + ((mx - 1) * Cell.SIZE)
+			local y = self.y + ((my - 1) * Cell.SIZE)
+			Cell:draw(x, y, self.color)
 		end
 	end)
 end
 
 ---@return number, number
 function Tetronimo:getGridPosition()
-	return self.x / CELL_SIZE + 1, self.y / CELL_SIZE + 1
+	return self.x / Cell.SIZE + 1, self.y / Cell.SIZE + 1
 end
 
 function Tetronimo:setGridPosition(x, y)
 	x = x - 1
 	y = y - 1
-	self:setPosition(x * CELL_SIZE, y * CELL_SIZE)
+	self:setPosition(x * Cell.SIZE, y * Cell.SIZE)
 end
 
 ---@alias direction
@@ -121,24 +120,20 @@ end
 ---@param num? number
 function Tetronimo:move(dir, num)
 	num = num or 1
-	switch(dir)({
-		["Left"] = function()
-			self.x = self.x - CELL_SIZE * num
-		end,
-		["Right"] = function()
-			self.x = self.x + CELL_SIZE * num
-		end,
-		["Down"] = function()
-			self.y = self.y + CELL_SIZE * num
-		end,
-	})
+	if dir == "Left" then
+		self.x = self.x - Cell.SIZE * num
+	elseif dir == "Right" then
+		self.x = self.x + Cell.SIZE * num
+	elseif dir == "Down" then
+		self.y = self.y + Cell.SIZE * num
+	end
 end
 
 function Tetronimo:getFullCells()
 	local tx, ty = self:getGridPosition()
 
 	local cells = self:map(function(mx, my, v)
-		if v == CellState.FULL then
+		if v == Cell.STATE.FULL then
 			local x = tx + mx - 1
 			local y = ty + my - 1
 			return { x = x, y = y }

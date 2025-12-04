@@ -1,28 +1,33 @@
 local Matrix = require("class.entity.matrix")
+local Cell = require("class.cell")
 local Tetronimo = require("class.entity.tetronimo").Tetronimo
 local GrabBag = require("class.entity.grabBag")
+local Interval = require("class.interval")
 
-local CellState = require("constants").CellState
-local CELL_SIZE = require("constants").CELL_SIZE
+local PALETTE = require("constants").PALETTE
 
 ---@class Board: Matrix
 ---@field grabBag GrabBag
 ---@field activePiece Tetronimo
 ---@field holdPiece Tetronimo
----@field fallDelay number
----@field fallTimer number
 ---@field colorMatrix Matrix
+---@field canHold boolean
+---@field nCleared number
 local Board = Matrix:extend()
 Board.super = Matrix
 
 function Board:new()
 	Board.super.new(self, 20, 10, 0)
 	self.grabBag = GrabBag()
-	self.fallDelay = 6
-	self.fallTimer = 0
 	self.colorMatrix = Matrix(self.rows, self.cols, 0)
 	self:spawnPiece(self.grabBag:takePiece())
 	self.holdPiece = nil
+	self.canHold = true
+	self.nCleared = 0
+	self.fallInterval = Interval(10, function()
+		self:handleGravity()
+	end)
+	self:updateFallSpeed()
 end
 
 ---@param tetronimo Tetronimo
@@ -36,22 +41,7 @@ function Board:spawnPiece(tetronimo)
 end
 
 function Board:update(dt)
-	-- If timer exceeds fall delay, remove delay from timer and execute fall logic
-	self.fallTimer = self.fallTimer + 10 * dt
-	if self.fallTimer >= self.fallDelay then
-		self.fallTimer = self.fallTimer - self.fallDelay
-		local canMove = self:moveActive("Down")
-
-		if not canMove then
-			local cells = self.activePiece:getFullCells()
-			for _, cell in ipairs(cells) do
-				pcall(self.setCell, self, cell.x, cell.y, CellState.FULL)
-				self.colorMatrix:setCell(cell.x, cell.y, self.activePiece.color)
-			end
-			self:spawnPiece(self.grabBag:takePiece())
-		end
-	end
-
+	self.fallInterval:update(dt)
 	self:clearFullLines()
 end
 
@@ -63,26 +53,27 @@ function Board:draw()
 	-- Draw grid
 	love.graphics.setColor(0.2, 0.2, 0.2, 1)
 	self:forEach(function(mx, my)
-		local x = (mx - 1) * CELL_SIZE
-		local y = (my - 1) * CELL_SIZE
-		love.graphics.rectangle("line", x, y, CELL_SIZE, CELL_SIZE)
-		-- love.graphics.print(string.format("%d,%d", j, i), x, y)
+		local x = (mx - 1) * Cell.SIZE
+		local y = (my - 1) * Cell.SIZE
+		love.graphics.rectangle("line", x, y, Cell.SIZE, Cell.SIZE)
 	end)
 
 	-- Draw filled cells
 	self:forEach(function(mx, my, v)
-		local x = (mx - 1) * CELL_SIZE
-		local y = (my - 1) * CELL_SIZE
-		if v == CellState.FULL then
+		local x = (mx - 1) * Cell.SIZE
+		local y = (my - 1) * Cell.SIZE
+		if v == Cell.STATE.FULL then
 			local color = self.colorMatrix:getCell(mx, my)
 			assert(type(color) == "table", string.format("Color matrix value at {%d,%d} is not a table", mx, my))
-			love.graphics.setColor(color)
-			love.graphics.rectangle("fill", x, y, CELL_SIZE, CELL_SIZE)
+			Cell:draw(x, y, color)
 		end
 	end)
 
 	-- Draw active piece & ghost
-	self:getGhost():draw()
+	local ghost = self:getGhost()
+	ghost.color = PALETTE.cloud
+	ghost.color[4] = 0.2
+	ghost:draw()
 	self.activePiece:draw()
 
 	-- Draw edges
@@ -91,35 +82,38 @@ function Board:draw()
 	love.graphics.line(right, top, right, bottom)
 	love.graphics.line(left, bottom, right, bottom)
 
+	-- Draw score
+	love.graphics.print("LINES CLEARED: " .. self.nCleared, 0, -20)
+
 	-- Draw held piece
 	love.graphics.push()
-	love.graphics.translate(-CELL_SIZE * 6.5, CELL_SIZE * 1)
+	love.graphics.translate(-Cell.SIZE * 6.5, Cell.SIZE * 1)
 	love.graphics.print("HOLD", 0, -20)
-	local w = CELL_SIZE * 5.5
-	local h = CELL_SIZE * 3.5
+	local w = Cell.SIZE * 5.5
+	local h = Cell.SIZE * 3.5
 	love.graphics.rectangle("line", 0, 0, w, h)
 	if self.holdPiece ~= nil then
 		local t = self.holdPiece
-		local x = (w / 2) - (t.cols * CELL_SIZE / 2)
-		local y = (h / 2) - (t.rows * CELL_SIZE / 2)
+		local x = (w / 2) - (t.cols * Cell.SIZE / 2)
+		local y = (h / 2) - (t.rows * Cell.SIZE / 2)
 		t:setPosition(x, y)
 		t:draw()
 	end
 	love.graphics.pop()
 
 	-- Draw next pieces
-	love.graphics.translate(self:getWidth() + CELL_SIZE * 1.5, 0)
+	love.graphics.translate(self:getWidth() + Cell.SIZE * 1.5, 0)
 	self.grabBag:draw()
 
 	love.graphics.pop()
 end
 
 function Board:getWidth()
-	return self.cols * CELL_SIZE
+	return self.cols * Cell.SIZE
 end
 
 function Board:getHeight()
-	return self.rows * CELL_SIZE
+	return self.rows * Cell.SIZE
 end
 
 ---@param dir direction
@@ -158,6 +152,18 @@ function Board:moveActive(dir)
 	return canMove
 end
 
+function Board:handleGravity()
+	local canMove = self:moveActive("Down")
+	if not canMove then
+		for _, cell in ipairs(self.activePiece:getFullCells()) do
+			pcall(self.setCell, self, cell.x, cell.y, Cell.STATE.FULL)
+			self.colorMatrix:setCell(cell.x, cell.y, self.activePiece.color)
+		end
+		self:spawnPiece(self.grabBag:takePiece())
+		self.canHold = true
+	end
+end
+
 ---@param rot rotation
 function Board:checkRotation(rot)
 	local t = self.activePiece
@@ -168,32 +174,39 @@ function Board:checkRotation(rot)
 
 	for _, cell in ipairs(activeCells) do
 		local state = self:getCell(cell.x, cell.y)
-		if state == CellState.FULL or state == nil then
+		if state == Cell.STATE.FULL or state == nil then
 			return false
 		end
 	end
 	return true
 end
 
+---@return boolean
 function Board:clearFullLines()
 	local isFull = false
+	local linesCleared = 0
 
 	for my = 1, #self.matrix do
 		for mx = 1, #self.matrix[my] do
-			isFull = self:getCell(mx, my) == CellState.FULL
+			isFull = self:getCell(mx, my) == Cell.STATE.FULL
 			if not isFull then
 				break
 			end
 		end
 		if isFull then
-			Log:print(string.format("Line #%d is full", my))
 			self:removeRow(my)
 			self:insertRow(1, 0)
 			self.colorMatrix:removeRow(my)
 			self.colorMatrix:insertRow(1, 0)
 			isFull = false
+			linesCleared = linesCleared + 1
 		end
 	end
+	if linesCleared > 0 then
+		self.nCleared = self.nCleared + linesCleared
+		self:updateFallSpeed()
+	end
+	return linesCleared > 0
 end
 
 function Board:getGhost()
@@ -207,9 +220,6 @@ function Board:getGhost()
 		nLoops = nLoops + 1
 		assert(nLoops < 1000, "Infinite loop stopped.")
 	until not canMove
-
-	ghost.color = util.hexToRGB("666666")
-	ghost.color[4] = 0.8
 	return ghost
 end
 
@@ -222,6 +232,10 @@ function Board:swapHoldPiece()
 	end
 	self.holdPiece = Tetronimo(self.activePiece.shape)
 	self:spawnPiece(nextPiece)
+end
+
+function Board:updateFallSpeed()
+	self.fallInterval:setLength(0.6 / (1 + self.nCleared ^ 0.4))
 end
 
 return Board
