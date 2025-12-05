@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodule: recursive
+          submodules: recursive
       - name: Build core love package
         uses: love-actions/love-actions-core@v1.1.1
         with:
