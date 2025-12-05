@@ -16,10 +16,13 @@ jobs:
     env:
       OUTPUT_FOLDER: ./build
     steps:
+      - uses: actions/checkout@v4
+        with:
+          submodule: recursive
       - name: Build core love package
         uses: love-actions/love-actions-core@v1.1.1
         with:
-          build-list: ./main.lua ./conf.lua ./constants.lua ./classic.lua ./class/ ./haert/
+          build-list: ./class/ ./haert/ ./main.lua ./conf.lua ./constants.lua ./classic.lua
           package-path: ${{ env.CORE_LOVE_PACKAGE_PATH }}
       - name: Upload core love package
         uses: actions/upload-artifact@v4
