@@ -3,8 +3,11 @@ local Cell = require("class.cell")
 local Tetronimo = require("class.entity.tetronimo").Tetronimo
 local GrabBag = require("class.entity.grabBag")
 local Interval = require("class.interval")
+local Timer = require("class.timer")
 
 local PALETTE = require("constants").PALETTE
+local LOCK_RESET_LIMIT = 16
+local LOCK_DELAY_TIME = 0.5
 
 ---@class Board: Matrix
 ---@field grabBag GrabBag
@@ -13,21 +16,27 @@ local PALETTE = require("constants").PALETTE
 ---@field colorMatrix Matrix
 ---@field canHold boolean
 ---@field nCleared number
+---@field fallInterval Interval
+---@field lockDelay Timer
+---@field lockDelayResets number
 local Board = Matrix:extend()
 Board.super = Matrix
 
 function Board:new()
 	Board.super.new(self, 20, 10, 0)
-	self.grabBag = GrabBag()
-	self.colorMatrix = Matrix(self.rows, self.cols, 0)
-	self:spawnPiece(self.grabBag:takePiece())
+	self.level = 1
+	self.nCleared = 0
 	self.holdPiece = nil
 	self.canHold = true
-	self.nCleared = 0
-	self.fallInterval = Interval(10, function()
-		self:handleGravity()
+	self.grabBag = GrabBag()
+	self.colorMatrix = Matrix(self.rows, self.cols, 0)
+	self.lockDelay = Timer()
+	self.lockDelayResets = 0
+	self.fallInterval = Interval(0.0, function()
+		self:moveActive("Down")
 	end)
-	self:updateFallSpeed()
+	self:updateGravity()
+	self:spawnPiece(self.grabBag:takePiece())
 end
 
 ---@param tetronimo Tetronimo
@@ -38,10 +47,22 @@ function Board:spawnPiece(tetronimo)
 		x = x + 1
 	end
 	self.activePiece:setGridPosition(x, 1)
+	self.lockDelayResets = 0
+	self.lockDelay:stop()
+	self.lockDelay:reset()
 end
 
 function Board:update(dt)
 	self.fallInterval:update(dt)
+	self.lockDelay:update(dt)
+
+	if self.lockDelay.running then
+		if self.lockDelay.time >= LOCK_DELAY_TIME or self.lockDelayResets >= LOCK_RESET_LIMIT then
+			self.fallInterval:forceTrigger()
+			self:lockPiece()
+		end
+	end
+
 	self:clearFullLines()
 end
 
@@ -102,8 +123,10 @@ function Board:draw()
 	love.graphics.pop()
 
 	-- Draw next pieces
+	love.graphics.push()
 	love.graphics.translate(self:getWidth() + Cell.SIZE * 1.5, 0)
 	self.grabBag:draw()
+	love.graphics.pop()
 
 	love.graphics.pop()
 end
@@ -144,24 +167,51 @@ function Board:checkMove(dir, t)
 end
 
 ---@param dir direction
+---@return boolean
 function Board:moveActive(dir)
 	local canMove = self:checkMove(dir, self.activePiece)
 	if canMove then
-		self.activePiece:move(dir)
+		self:tranformActive(function()
+			return self.activePiece:move(dir)
+		end)
 	end
 	return canMove
 end
 
-function Board:handleGravity()
-	local canMove = self:moveActive("Down")
-	if not canMove then
-		for _, cell in ipairs(self.activePiece:getFullCells()) do
-			pcall(self.setCell, self, cell.x, cell.y, Cell.STATE.FULL)
-			self.colorMatrix:setCell(cell.x, cell.y, self.activePiece.color)
-		end
-		self:spawnPiece(self.grabBag:takePiece())
-		self.canHold = true
+---@param rot rotation
+---@return boolean
+function Board:rotateActive(rot)
+	local canRotate = self:checkRotation(rot)
+	if canRotate then
+		self:tranformActive(function()
+			return self.activePiece:rotate(rot)
+		end)
 	end
+	return canRotate
+end
+
+---@param transformFunc function
+function Board:tranformActive(transformFunc)
+	local result = transformFunc()
+	local isGrounded = not self:checkMove("Down", self.activePiece)
+	if isGrounded then
+		self.lockDelay:start()
+		self.lockDelayResets = self.lockDelayResets + 1
+	else
+		self.lockDelay:stop()
+		self.lockDelayResets = 0
+	end
+	self.lockDelay:reset()
+	return result
+end
+
+function Board:lockPiece()
+	for _, cell in ipairs(self.activePiece:getFullCells()) do
+		self:setCell(cell.x, cell.y, Cell.STATE.FULL)
+		self.colorMatrix:setCell(cell.x, cell.y, self.activePiece.color)
+	end
+	self.canHold = true
+	self:spawnPiece(self.grabBag:takePiece())
 end
 
 ---@param rot rotation
@@ -204,7 +254,7 @@ function Board:clearFullLines()
 	end
 	if linesCleared > 0 then
 		self.nCleared = self.nCleared + linesCleared
-		self:updateFallSpeed()
+		self:updateGravity()
 	end
 	return linesCleared > 0
 end
@@ -234,8 +284,14 @@ function Board:swapHoldPiece()
 	self:spawnPiece(nextPiece)
 end
 
-function Board:updateFallSpeed()
-	self.fallInterval:setLength(0.6 / (1 + self.nCleared ^ 0.4))
+function Board:getLevel()
+	return math.floor(self.nCleared / 10) + 1
+end
+
+function Board:updateGravity()
+	local a = math.min(self:getLevel(), 20) - 1
+	local len = (0.8 - (a * 0.007)) ^ a
+	self.fallInterval:setLength(len)
 end
 
 return Board
