@@ -1,11 +1,28 @@
-on: [push]
+name: Love Actions
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CORE_LOVE_ARTIFACT_NAME: core_tetris
+  CORE_LOVE_PACKAGE_PATH: ./core.love
+    
 jobs:
-  Love-compile:
+  build-core:
     runs-on: ubuntu-latest
+    env:
+      OUTPUT_FOLDER: ./build
     steps:
-    - name: Love ations bare package
-      uses: love-actions/love-actions-core@v1.1.1
-      with:
-        build-list: ./*.lua ./class/ ./haert/
-        package-path: ./bare/tetris.love
-        
+      - name: Build core love package
+        uses: love-actions/love-actions-core@v1.1.1
+        with:
+          build-list: ./main.lua ./conf.lua ./constants.lua ./classic.lua ./class/ ./haert/
+          package-path: ${{ env.CORE_LOVE_PACKAGE_PATH }}
+      - name: Upload core love package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.CORE_LOVE_ARTIFACT_NAME }}
+          path: ${{ env.CORE_LOVE_PACKAGE_PATH }}
