@@ -1,0 +1,4 @@
+- name: Love actions bare package
+  uses: love-actions/love-actions-core@v1.1.1
+  with:
+  build-list: ./*.lua ./class ./haert
