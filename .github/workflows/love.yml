@@ -6,6 +6,6 @@ jobs:
     - name: Love ations bare package
       uses: love-actions/love-actions-core@v1.1.1
       with:
-        build-list: ./*.lua ./class ./haert
+        build-list: ./*.lua ./class/ ./haert/
         package-path: ./bare/tetris.love
         
