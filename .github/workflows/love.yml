@@ -7,10 +7,12 @@ on:
     branches: [main]
 
 env:
-  APP_NAME: LOVE-Tetris
-  CORE_LOVE_ARTIFACT_NAME: core_tetris
+  CORE_LOVE_ARTIFACT_NAME: core_love_package
   CORE_LOVE_PACKAGE_PATH: ./core.love
   OUTPUT_FOLDER: ./build
+  PRODUCT_NAME: love_tetris
+  BUNDLE_ID: com.example.lovetetris
+  BUILD_ASSETS_FOLDER: ./.github/build
 
 jobs:
 
@@ -23,7 +25,7 @@ jobs:
       - name: Build core love package
         uses: love-actions/love-actions-core@v1.1.1
         with:
-          build-list: ./class/ ./haert/ ./main.lua ./conf.lua ./constants.lua ./classic.lua
+          build-list: ./asset/ ./class/ ./haert/ ./main.lua ./conf.lua ./constants.lua ./classic.lua
           package-path: ${{ env.CORE_LOVE_PACKAGE_PATH }}
       - name: Upload core love package
         uses: actions/upload-artifact@v4
@@ -36,22 +38,68 @@ jobs:
     needs: [build-core]
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Download core love package
         uses: actions/download-artifact@v4
         with:
           name: ${{ env.CORE_LOVE_ARTIFACT_NAME }}
+      - name: Add icon to love package
+        run: |
+          cp ${{ env.BUILD_ASSETS_FOLDER }}/icon.png build_icon.png
+          zip -u ${{ env.CORE_LOVE_PACKAGE_PATH }} build_icon.png
+          rm build_icon.png
       - name: Build Linux package
         id: build-packages
         uses: love-actions/love-actions-linux@v2
         with:
-          app-name: ${{ env.APP_NAME }}
-          icon-path: ./.github/build/linux/dev/icon.png
+          app-name: ${{ env.PRODUCT_NAME }}
+          bundle-id: ${{ env.BUNDLE_ID }}
+          version-string: "0.1.0"
+          icon-path: ${{ env.BUILD_ASSETS_FOLDER }}/icon.png
           love-ref: "11.5"
           love-package: ${{ env.CORE_LOVE_PACKAGE_PATH }}
+          product-name: ${{ env.PRODUCT_NAME }}
           output-folder: ${{ env.OUTPUT_FOLDER }}
-          version-string: "alpha-0.1.0"
+          build-deb: false
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.APP_NAME }}_Linux_AppImage
-          path: ${{ env.OUTPUT_FOLDER }}/${{ env.APP_NAME }}.AppImage
+          name: ${{ env.PRODUCT_NAME }}_Linux_AppImage
+          path: ${{ env.OUTPUT_FOLDER }}/${{ env.PRODUCT_NAME }}.AppImage
+
+  build-windows:
+    runs-on: windows-latest
+    needs: [build-core]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Download core love package
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.CORE_LOVE_ARTIFACT_NAME }}
+      - name: Build Windows packages
+        id: build-packages
+        uses: love-actions/love-actions-windows@v2
+        with:
+          icon-path: ${{ env.BUILD_ASSETS_FOLDER }}/icon.png
+          love-ref: "11.5"
+          love-package: ${{ env.CORE_LOVE_PACKAGE_PATH }}
+          product-name: ${{ env.PRODUCT_NAME }}
+          output-folder: ${{ env.OUTPUT_FOLDER }}
+      - name: Upload 32-bit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PRODUCT_NAME }}_Windows_x86
+          path: ${{ env.OUTPUT_FOLDER }}/${{ env.PRODUCT_NAME }}_x86.zip
+      - name: Upload 64-bit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PRODUCT_NAME }}_Windows_x64
+          path: ${{ env.OUTPUT_FOLDER }}/${{ env.PRODUCT_NAME }}_x64.zip
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PRODUCT_NAME }}_Windows_installer
+          path: ${{ env.OUTPUT_FOLDER }}/${{ env.PRODUCT_NAME }}_installer.exe
