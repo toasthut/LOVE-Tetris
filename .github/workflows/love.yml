@@ -62,6 +62,7 @@ jobs:
           love-package: ${{ env.CORE_LOVE_PACKAGE_PATH }}
           product-name: ${{ env.PRODUCT_NAME }}
           output-folder: ${{ env.OUTPUT_FOLDER }}
+          build-deb: false
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
