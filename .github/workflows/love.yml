@@ -7,10 +7,12 @@ on:
     branches: [main]
 
 env:
-  APP_NAME: LOVE-Tetris
-  CORE_LOVE_ARTIFACT_NAME: core_tetris
+  CORE_LOVE_ARTIFACT_NAME: core_love_package
   CORE_LOVE_PACKAGE_PATH: ./core.love
   OUTPUT_FOLDER: ./build
+  PRODUCT_NAME: love_tetris
+  APP_NAME: LOVE-Tetris
+  BUNDLE_ID: com.example.lovetetris
 
 jobs:
 
@@ -45,13 +47,15 @@ jobs:
         uses: love-actions/love-actions-linux@v2
         with:
           app-name: ${{ env.APP_NAME }}
-          icon-path: ./.github/build/linux/dev/icon.png
+          bundle-id: ${{ env.BUNDLE_ID }}
+          version-string: "alpha-0.1.0"
           love-ref: "11.5"
           love-package: ${{ env.CORE_LOVE_PACKAGE_PATH }}
+          product-name: ${{ env.PRODUCT_NAME }}
           output-folder: ${{ env.OUTPUT_FOLDER }}
-          version-string: "alpha-0.1.0"
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}_Linux_AppImage
-          path: ${{ env.OUTPUT_FOLDER }}/${{ env.APP_NAME }}.AppImage
+          path: ${{ env.OUTPUT_FOLDER }}/${{ env.PRODUCT_NAME }}.AppImage
+
