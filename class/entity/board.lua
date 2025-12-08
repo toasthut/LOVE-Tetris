@@ -4,10 +4,12 @@ local Tetronimo = require("class.entity.tetronimo").Tetronimo
 local GrabBag = require("class.entity.grabBag")
 local Interval = require("class.interval")
 local Timer = require("class.timer")
+local Audio = require("class.AudioManager")
 
 local PALETTE = require("constants").PALETTE
 local LOCK_RESET_LIMIT = 16
 local LOCK_DELAY_TIME = 0.5
+local SLAM_FACTOR = Cell.SIZE * 0.6
 
 ---@class Board: Matrix
 ---@field grabBag GrabBag
@@ -24,18 +26,23 @@ Board.super = Matrix
 
 function Board:new()
 	Board.super.new(self, 20, 10, 0)
+	self.colorMatrix = Matrix(self.rows, self.cols, 0)
+	self.offset = { x = 0, y = 0 }
 	self.level = 1
 	self.nCleared = 0
+
+	self.grabBag = GrabBag()
 	self.holdPiece = nil
 	self.canHold = true
-	self.grabBag = GrabBag()
-	self.colorMatrix = Matrix(self.rows, self.cols, 0)
+	self.lowestY = 0
+
 	self.lockDelay = Timer()
 	self.lockDelayResets = 0
 	self.fallInterval = Interval(0.0, function()
-		self:moveActive("Down")
+		self:moveActive(0, 1)
 	end)
 	self:updateGravity()
+
 	self:spawnPiece(self.grabBag:takePiece())
 end
 
@@ -43,10 +50,21 @@ end
 function Board:spawnPiece(tetronimo)
 	self.activePiece = tetronimo
 	local x = (self.cols / 2) - 1
+	local y = 1
 	if self.activePiece.shape == "O" then
 		x = x + 1
+	elseif self.activePiece.shape == "I" then
+		y = 0
 	end
-	self.activePiece:setGridPosition(x, 1)
+	self.activePiece:setGridPosition(x, y)
+
+	for _, cell in ipairs(self.activePiece:getCellGridPositions()) do
+		if self:getCell(cell.x, cell.y) ~= Cell.STATE.EMPTY then
+			self.gameover = true
+		end
+	end
+
+	self.lowestY = y
 	self.lockDelayResets = 0
 	self.lockDelay:stop()
 	self.lockDelay:reset()
@@ -55,6 +73,11 @@ end
 function Board:update(dt)
 	self.fallInterval:update(dt)
 	self.lockDelay:update(dt)
+
+	if self.offset.x > 0 or self.offset.y > 0 then
+		self.offset.x = math.max(0, self.offset.x - self.offset.x * 10 * dt)
+		self.offset.y = math.max(0, self.offset.y - (self.offset.y ^ 2) * 1.5 * dt)
+	end
 
 	if self.lockDelay.running then
 		if self.lockDelay.time >= LOCK_DELAY_TIME or self.lockDelayResets >= LOCK_RESET_LIMIT then
@@ -71,64 +94,111 @@ function Board:draw()
 	love.graphics.translate(self.x, self.y)
 	local left, right, top, bottom = 0, self:getWidth(), 0, self:getHeight()
 
-	-- Draw grid
-	love.graphics.setColor(0.2, 0.2, 0.2, 1)
-	self:forEach(function(mx, my)
-		local x = (mx - 1) * Cell.SIZE
-		local y = (my - 1) * Cell.SIZE
-		love.graphics.rectangle("line", x, y, Cell.SIZE, Cell.SIZE)
-	end)
+	love.graphics.push()
+	do
+		love.graphics.translate(self.offset.x, self.offset.y)
 
-	-- Draw filled cells
-	self:forEach(function(mx, my, v)
-		local x = (mx - 1) * Cell.SIZE
-		local y = (my - 1) * Cell.SIZE
-		if v == Cell.STATE.FULL then
-			local color = self.colorMatrix:getCell(mx, my)
-			assert(type(color) == "table", string.format("Color matrix value at {%d,%d} is not a table", mx, my))
-			Cell:draw(x, y, color)
-		end
-	end)
+		-- Draw grid
+		love.graphics.setColor(0.2, 0.2, 0.2, 1)
+		self:forEach(function(mx, my)
+			local x = (mx - 1) * Cell.SIZE
+			local y = (my - 1) * Cell.SIZE
+			love.graphics.rectangle("line", x, y, Cell.SIZE, Cell.SIZE)
+		end)
 
-	-- Draw active piece & ghost
-	local ghost = self:getGhost()
-	ghost.color = PALETTE.cloud
-	ghost.color[4] = 0.2
-	ghost:draw()
-	self.activePiece:draw()
+		-- Draw filled cells
+		self:forEach(function(mx, my, v)
+			local x = (mx - 1) * Cell.SIZE
+			local y = (my - 1) * Cell.SIZE
+			if v == Cell.STATE.FULL then
+				local color = self.colorMatrix:getCell(mx, my)
+				assert(type(color) == "table", string.format("Color matrix value at {%d,%d} is not a table", mx, my))
+				Cell:draw(x, y, color)
+			end
+		end)
 
-	-- Draw edges
-	love.graphics.setColor(1, 1, 1, 1)
-	love.graphics.line(left, top, left, bottom)
-	love.graphics.line(right, top, right, bottom)
-	love.graphics.line(left, bottom, right, bottom)
+		-- Draw active piece & ghost
+		local ghost = self:getGhost()
+		ghost.color = PALETTE.cloud
+		ghost.color[4] = 0.2
+		ghost:draw()
+		self.activePiece:draw()
+
+		-- Draw edges
+		love.graphics.setColor(1, 1, 1, 1)
+		love.graphics.line(left, top, left, bottom)
+		love.graphics.line(right, top, right, bottom)
+		love.graphics.line(left, bottom, right, bottom)
+	end
+	love.graphics.pop()
 
 	-- Draw score
+	love.graphics.print("LEVEL: " .. self.level, 0, -40)
 	love.graphics.print("LINES CLEARED: " .. self.nCleared, 0, -20)
 
 	-- Draw held piece
 	love.graphics.push()
-	love.graphics.translate(-Cell.SIZE * 6.5, Cell.SIZE * 1)
-	love.graphics.print("HOLD", 0, -20)
-	local w = Cell.SIZE * 5.5
-	local h = Cell.SIZE * 3.5
-	love.graphics.rectangle("line", 0, 0, w, h)
-	if self.holdPiece ~= nil then
-		local t = self.holdPiece
-		local x = (w / 2) - (t.cols * Cell.SIZE / 2)
-		local y = (h / 2) - (t.rows * Cell.SIZE / 2)
-		t:setPosition(x, y)
-		t:draw()
+	do
+		love.graphics.translate(-Cell.SIZE * 6.5, Cell.SIZE * 1)
+		love.graphics.print("HOLD", 0, -20)
+		local w = Cell.SIZE * 5.5
+		local h = Cell.SIZE * 3.5
+		love.graphics.rectangle("line", 0, 0, w, h)
+		if self.holdPiece ~= nil then
+			local t = self.holdPiece
+			local x = (w / 2) - (t.cols * Cell.SIZE / 2)
+			local y = (h / 2) - (t.rows * Cell.SIZE / 2)
+			t:setPosition(x, y)
+			t:draw()
+		end
 	end
 	love.graphics.pop()
 
 	-- Draw next pieces
 	love.graphics.push()
-	love.graphics.translate(self:getWidth() + Cell.SIZE * 1.5, 0)
-	self.grabBag:draw()
+	do
+		love.graphics.translate(self:getWidth() + Cell.SIZE * 1.5, 0)
+		self.grabBag:draw()
+	end
 	love.graphics.pop()
 
 	love.graphics.pop()
+
+	if self.gameover then
+		local text = "GAME OVER"
+		local color = { love.graphics.getColor() }
+		love.graphics.setColor(0.1, 0.1, 0.1)
+		love.graphics.setNewFont(64)
+		local buh = { 1, -1, 2, -2 }
+		for i = 1, #buh do
+			for j = 1, #buh do
+				love.graphics.print(
+					text,
+					love.graphics.getWidth() / 2 + buh[i],
+					love.graphics.getHeight() / 2 + buh[j],
+					0,
+					1,
+					1,
+					love.graphics.getFont():getWidth(text) / 2,
+					love.graphics.getFont():getHeight() / 2
+				)
+			end
+		end
+
+		love.graphics.setColor(color)
+		love.graphics.print(
+			text,
+			love.graphics.getWidth() / 2,
+			love.graphics.getHeight() / 2,
+			0,
+			1,
+			1,
+			love.graphics.getFont():getWidth(text) / 2,
+			love.graphics.getFont():getHeight() / 2
+		)
+		love.graphics.setNewFont()
+		-- love.graphics.print("YOU LOSE BITCH!!!")
+	end
 end
 
 function Board:getWidth()
@@ -139,79 +209,26 @@ function Board:getHeight()
 	return self.rows * Cell.SIZE
 end
 
----@param dir direction
+---@param x number
+---@param y number
 ---@param t Tetronimo
-function Board:checkMove(dir, t)
-	local activeCells = t:getFullCells()
+function Board:checkMove(x, y, t)
+	local activeCells = t:getCellGridPositions()
 	for _, cell in ipairs(activeCells) do
 		-- Process position to move to
-		local x, y = cell.x, cell.y
-		if dir == "Left" then
-			x = cell.x - 1
-		elseif dir == "Right" then
-			x = cell.x + 1
-		elseif dir == "Down" then
-			y = cell.y + 1
-		end
+		local nx = cell.x + x
+		local ny = cell.y + y
 
 		-- Check if position is OOB
-		if x < 1 or x > self.cols or y > self.rows then
+		if nx < 1 or nx > self.cols or ny > self.rows then
 			return false
 		end
 		-- Check if position is not empty
-		if self:getCell(x, y) ~= 0 then
+		if self:getCell(nx, ny) ~= 0 then
 			return false
 		end
 	end
 	return true
-end
-
----@param dir direction
----@return boolean
-function Board:moveActive(dir)
-	local canMove = self:checkMove(dir, self.activePiece)
-	if canMove then
-		self:tranformActive(function()
-			return self.activePiece:move(dir)
-		end)
-	end
-	return canMove
-end
-
----@param rot rotation
----@return boolean
-function Board:rotateActive(rot)
-	local canRotate = self:checkRotation(rot)
-	if canRotate then
-		self:tranformActive(function()
-			return self.activePiece:rotate(rot)
-		end)
-	end
-	return canRotate
-end
-
----@param transformFunc function
-function Board:tranformActive(transformFunc)
-	local result = transformFunc()
-	local isGrounded = not self:checkMove("Down", self.activePiece)
-	if isGrounded then
-		self.lockDelay:start()
-		self.lockDelayResets = self.lockDelayResets + 1
-	else
-		self.lockDelay:stop()
-		self.lockDelayResets = 0
-	end
-	self.lockDelay:reset()
-	return result
-end
-
-function Board:lockPiece()
-	for _, cell in ipairs(self.activePiece:getFullCells()) do
-		self:setCell(cell.x, cell.y, Cell.STATE.FULL)
-		self.colorMatrix:setCell(cell.x, cell.y, self.activePiece.color)
-	end
-	self.canHold = true
-	self:spawnPiece(self.grabBag:takePiece())
 end
 
 ---@param rot rotation
@@ -220,7 +237,7 @@ function Board:checkRotation(rot)
 	local testPiece = t:copy()
 	testPiece:rotate(rot)
 
-	local activeCells = testPiece:getFullCells()
+	local activeCells = testPiece:getCellGridPositions()
 
 	for _, cell in ipairs(activeCells) do
 		local state = self:getCell(cell.x, cell.y)
@@ -229,6 +246,105 @@ function Board:checkRotation(rot)
 		end
 	end
 	return true
+end
+
+---@param rot rotation
+function Board:findRotationPosition(rot)
+	local isValidPosition = true
+	local validKick = false
+
+	local t = self.activePiece:copy()
+	t:rotate(rot)
+	local tCells = t:getCellGridPositions()
+
+	local degRotated = t.degreesRotated
+	local kickList = Tetronimo.KICKS[rot][tostring(degRotated)]
+
+	for i = 1, #kickList do
+		isValidPosition = true
+		for _, cell in ipairs(tCells) do
+			local kx, ky = kickList[i][1], kickList[i][2]
+			local state = self:getCell(cell.x + kx, cell.y + ky)
+			if state == Cell.STATE.FULL or state == nil then
+				isValidPosition = false
+				break
+			end
+		end
+		if isValidPosition then
+			validKick = kickList[i]
+			break
+		end
+	end
+	return validKick
+end
+
+---@param x number
+---@param y number
+---@param playSound? boolean
+---@return boolean
+function Board:moveActive(x, y, playSound)
+	local canMove = self:checkMove(x, y, self.activePiece)
+	if canMove then
+		self:tranformActive(function()
+			return self.activePiece:move(x, y)
+		end)
+		if playSound and x ~= 0 then
+			Audio.sfx.xMove:clone():play()
+		elseif playSound and y ~= 0 then
+			Audio.sfx.softDrop:clone():play()
+		end
+	end
+	return canMove
+end
+
+---@param rot rotation
+---@return boolean
+function Board:rotateActive(rot)
+	local pos = self:findRotationPosition(rot)
+	if pos then
+		self:tranformActive(function()
+			local x, y = pos[1], pos[2]
+			self.activePiece:move(x, y)
+			self.activePiece:rotate(rot)
+		end)
+		Audio.sfx.rotate:clone():play()
+	end
+	return pos
+end
+
+---@param transformFunc function
+function Board:tranformActive(transformFunc)
+	local result = transformFunc()
+	local isGrounded = not self:checkMove(0, 1, self.activePiece)
+	if isGrounded then
+		if not self.lockDelay.running then
+			Audio.sfx.touchGround:play()
+		end
+		self.lockDelay:start()
+		self.lockDelayResets = self.lockDelayResets + 1
+	else
+		self.lockDelay:stop()
+	end
+
+	local _, gy = self.activePiece:getGridPosition()
+	if self.lowestY < gy then
+		self.lowestY = gy
+		if not isGrounded then
+			self.lockDelayResets = 0
+		end
+	end
+
+	self.lockDelay:reset()
+	return result
+end
+
+function Board:lockPiece()
+	for _, cell in ipairs(self.activePiece:getCellGridPositions()) do
+		self:setCell(cell.x, cell.y, Cell.STATE.FULL)
+		self.colorMatrix:setCell(cell.x, cell.y, self.activePiece.color)
+	end
+	self.canHold = true
+	self:spawnPiece(self.grabBag:takePiece())
 end
 
 ---@return boolean
@@ -256,6 +372,7 @@ function Board:clearFullLines()
 		self.nCleared = self.nCleared + linesCleared
 		self:updateGravity()
 	end
+	self.level = self:getLevel()
 	return linesCleared > 0
 end
 
@@ -263,9 +380,9 @@ function Board:getGhost()
 	local ghost = self.activePiece:copy()
 	local nLoops = 0
 	repeat
-		local canMove = self:checkMove("Down", ghost)
+		local canMove = self:checkMove(0, 1, ghost)
 		if canMove then
-			ghost:move("Down")
+			ghost:move(0, 1)
 		end
 		nLoops = nLoops + 1
 		assert(nLoops < 1000, "Infinite loop stopped.")
@@ -274,14 +391,33 @@ function Board:getGhost()
 end
 
 function Board:swapHoldPiece()
-	local nextPiece
-	if self.holdPiece ~= nil then
-		nextPiece = Tetronimo(self.holdPiece.shape)
-	else
-		nextPiece = self.grabBag:takePiece()
+	if self.canHold then
+		local nextPiece
+		if self.holdPiece ~= nil then
+			nextPiece = Tetronimo(self.holdPiece.shape)
+		else
+			nextPiece = self.grabBag:takePiece()
+		end
+		self.holdPiece = Tetronimo(self.activePiece.shape)
+		self:spawnPiece(nextPiece)
+		self.canHold = false
+		Audio.sfx.holdPiece:play()
 	end
-	self.holdPiece = Tetronimo(self.activePiece.shape)
-	self:spawnPiece(nextPiece)
+end
+
+function Board:softDrop()
+	local moved = self:moveActive(0, 1, true)
+	if moved then
+		self.fallInterval:reset()
+	end
+end
+
+function Board:hardDrop()
+	self.fallInterval:reset()
+	self.activePiece = self:getGhost()
+	self:lockPiece()
+	Audio.sfx.hardDrop:clone():play()
+	self.offset.y = self.offset.y + SLAM_FACTOR
 end
 
 function Board:getLevel()

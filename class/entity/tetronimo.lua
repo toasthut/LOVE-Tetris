@@ -6,7 +6,10 @@ local PALETTE = require("constants").PALETTE
 local TetShapes = {
 	I = {
 		shape = {
+			{ 0, 0, 0, 0 },
 			{ 1, 1, 1, 1 },
+			{ 0, 0, 0, 0 },
+			{ 0, 0, 0, 0 },
 		},
 		color = PALETTE.aqua,
 	},
@@ -21,6 +24,7 @@ local TetShapes = {
 		shape = {
 			{ 0, 1, 1 },
 			{ 1, 1, 0 },
+			{ 0, 0, 0 },
 		},
 		color = PALETTE.lime,
 	},
@@ -28,6 +32,7 @@ local TetShapes = {
 		shape = {
 			{ 1, 1, 0 },
 			{ 0, 1, 1 },
+			{ 0, 0, 0 },
 		},
 		color = PALETTE.strawberry,
 	},
@@ -35,6 +40,7 @@ local TetShapes = {
 		shape = {
 			{ 0, 0, 1 },
 			{ 1, 1, 1 },
+			{ 0, 0, 0 },
 		},
 		color = PALETTE.carrot,
 	},
@@ -42,6 +48,7 @@ local TetShapes = {
 		shape = {
 			{ 1, 0, 0 },
 			{ 1, 1, 1 },
+			{ 0, 0, 0 },
 		},
 		color = PALETTE.skyblue,
 	},
@@ -57,6 +64,7 @@ local TetShapes = {
 
 ---@class Tetronimo: Matrix
 ---@field shape string
+---@field degreesRotated deg90Interval
 ---@field color table
 local Tetronimo = Matrix:extend()
 Tetronimo.super = Matrix
@@ -69,6 +77,7 @@ function Tetronimo:new(shape)
 	self.matrix = matrix.matrix
 	self.shape = shape
 	self.color = prefab.color
+	self.degreesRotated = 0
 end
 
 function Tetronimo:copy()
@@ -83,6 +92,7 @@ function Tetronimo:copy()
 	t.cols = matrix.cols
 	t.matrix = matrix.matrix
 
+	t.degreesRotated = self.degreesRotated
 	t.color = {}
 	for i = 1, #self.color do
 		t.color[i] = self.color[i]
@@ -112,24 +122,23 @@ function Tetronimo:setGridPosition(x, y)
 	self:setPosition(x * Cell.SIZE, y * Cell.SIZE)
 end
 
----@alias direction
----| "Left"
----| "Right"
----| "Down"
----@param dir direction
----@param num? number
-function Tetronimo:move(dir, num)
-	num = num or 1
-	if dir == "Left" then
-		self.x = self.x - Cell.SIZE * num
-	elseif dir == "Right" then
-		self.x = self.x + Cell.SIZE * num
-	elseif dir == "Down" then
-		self.y = self.y + Cell.SIZE * num
+---@param x number
+---@param y number
+function Tetronimo:move(x, y)
+	self.x = self.x + Cell.SIZE * x
+	self.y = self.y + Cell.SIZE * y
+end
+
+function Tetronimo:rotate(rot)
+	self.super.rotate(self, rot)
+	if rot == "Clockwise" then
+		self.degreesRotated = (self.degreesRotated + 90) % 360
+	elseif rot == "CounterClockwise" then
+		self.degreesRotated = (self.degreesRotated - 90) % 360
 	end
 end
 
-function Tetronimo:getFullCells()
+function Tetronimo:getCellGridPositions()
 	local tx, ty = self:getGridPosition()
 
 	local cells = self:map(function(mx, my, v)
@@ -149,6 +158,61 @@ function Tetronimo.random()
 	local i = love.math.random(1, #keys)
 	return Tetronimo(keys[i])
 end
+
+function Tetronimo.generateKicks()
+	local rotDirections = { "Clockwise", "CounterClockwise" }
+	local rotDegrees = { 0, 90, 180, 270 }
+	local kicks = {}
+	for _, a in ipairs(rotDirections) do
+		kicks[a] = {}
+		for _, b in ipairs(rotDegrees) do
+			local k = Tetronimo.getKicks(a, b)
+			kicks[a][tostring(b)] = k
+		end
+	end
+	return kicks
+end
+
+---@private
+---@param rot rotation
+---@param targetDeg deg90Interval
+---@return table[]
+function Tetronimo.getKicks(rot, targetDeg)
+	local kicks = {}
+	-- The default y values in this data have been inverted because in this program,
+	-- a positive y value represents downward movement
+	local kickDefaults = {
+		{ 0, 0 },
+		{ -1, 0 },
+		{ -1, -1 },
+		{ 0, 2 },
+		{ -1, 2 },
+	}
+
+	for i, v in ipairs(kickDefaults) do
+		local x, y = v[1], v[2]
+		if x ~= 0 then
+			if rot == "Clockwise" and math.floor(targetDeg / 180) == 1 then
+				x = x * -1
+			end
+			if rot == "CounterClockwise" and math.ceil(targetDeg / 180) ~= 1 then
+				x = x * -1
+			end
+		end
+
+		if y ~= 0 then
+			if targetDeg % 180 == 0 then
+				y = y * -1
+			end
+		end
+
+		table.insert(kicks, i, { x, y })
+	end
+	return kicks
+end
+
+Tetronimo.KICKS = Tetronimo.generateKicks()
+print(util.tableToString(Tetronimo.KICKS, "Kicks"))
 
 return {
 	Tetronimo = Tetronimo,

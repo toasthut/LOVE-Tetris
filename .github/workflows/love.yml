@@ -7,14 +7,15 @@ on:
     branches: [main]
 
 env:
+  APP_NAME: LOVE-Tetris
   CORE_LOVE_ARTIFACT_NAME: core_tetris
   CORE_LOVE_PACKAGE_PATH: ./core.love
-    
+  OUTPUT_FOLDER: ./build
+
 jobs:
+
   build-core:
     runs-on: ubuntu-latest
-    env:
-      OUTPUT_FOLDER: ./build
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,3 +30,25 @@ jobs:
         with:
           name: ${{ env.CORE_LOVE_ARTIFACT_NAME }}
           path: ${{ env.CORE_LOVE_PACKAGE_PATH }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+    needs: [build-core]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download core love package
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.CORE_LOVE_ARTIFACT_NAME }}
+      - name: Build Linux package
+        id: build-packages
+        uses: love-actions/love-actions-linux@v2
+        with:
+          app-name: ${{ env.APP_NAME }}
+          love-package: ${{ env.CORE_LOVE_PACKAGE_PATH }}
+          output-folder: ${{ env.OUTPUT_FOLDER }}
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}_Linux_AppImage
+          path: ${{ env.OUTPUT_FOLDER }}/${{ env.APP_NAME }}.AppImage
