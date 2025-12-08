@@ -30,29 +30,19 @@ end
 function Tetris:loadKeybinds()
 	self.keybinds = {
 		Keybind("left", function()
-			if love.keyboard.isDown("right") then
-				return
-			end
-			self.board:moveActive("Left")
-		end, true),
+			self.board:moveActive(-1, 0, true)
+		end, true, nil, { "right" }),
 
 		Keybind("right", function()
-			if love.keyboard.isDown("left") then
-				return
-			end
-			self.board:moveActive("Right")
-		end, true),
+			self.board:moveActive(1, 0, true)
+		end, true, nil, { "left" }),
 
 		Keybind("down", function()
-			local moved = self.board:moveActive("Down")
-			if moved then
-				self.board.fallInterval:reset()
-			end
+			self.board:softDrop()
 		end, 0, 40),
 
 		Keybind("up", function()
-			self.board.activePiece = self.board:getGhost()
-			self.board:lockPiece()
+			self.board:hardDrop()
 		end),
 
 		Keybind("x", function()
@@ -64,10 +54,7 @@ function Tetris:loadKeybinds()
 		end),
 
 		Keybind("lshift", function()
-			if self.board.canHold then
-				self.board:swapHoldPiece()
-				self.board.canHold = false
-			end
+			self.board:swapHoldPiece()
 		end),
 
 		Keybind("p", function()

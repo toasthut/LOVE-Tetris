@@ -3,6 +3,7 @@ io.stdout:setvbuf("no")
 ---@diagnostic disable: lowercase-global
 Object = require("classic")
 util = require("haert.util")
+Audio = require("class.AudioManager")
 
 local Logger = require("class.logger")
 local Tetris = require("class.Tetris")
@@ -10,10 +11,19 @@ local Tetris = require("class.Tetris")
 ---@type Logger
 Log = Logger()
 
+---@alias rotation
+---| "Clockwise"
+---| "CounterClockwise"
+---@alias deg90Interval
+---| 0
+---| 90
+---| 180
+---| 270
+
 function love.load()
+	love.audio.setVolume(Audio.mainVolume)
 	Tetris:new()
 	Log:clear()
-	Log:print("game loaded")
 end
 
 ---@param dt number
