@@ -55,6 +55,7 @@ jobs:
         with:
           app-name: ${{ env.PRODUCT_NAME }}
           bundle-id: ${{ env.BUNDLE_ID }}
+          version-string: "0.1.0"
           icon-path: ${{ env.BUILD_ASSETS_FOLDER }}/icon.png
           love-ref: "11.5"
           love-package: ${{ env.CORE_LOVE_PACKAGE_PATH }}
@@ -83,7 +84,6 @@ jobs:
         uses: love-actions/love-actions-windows@v2
         with:
           icon-path: ${{ env.BUILD_ASSETS_FOLDER }}/icon.png
-          version-string: "0.1.0"
           love-ref: "11.5"
           love-package: ${{ env.CORE_LOVE_PACKAGE_PATH }}
           product-name: ${{ env.PRODUCT_NAME }}
