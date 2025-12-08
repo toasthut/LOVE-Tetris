@@ -11,7 +11,7 @@ env:
   CORE_LOVE_PACKAGE_PATH: ./core.love
   OUTPUT_FOLDER: ./build
   PRODUCT_NAME: love_tetris
-  APP_NAME: LOVE-Tetris
+  APP_NAME: LOVE_Tetris
   BUNDLE_ID: com.example.lovetetris
   BUILD_ASSETS_FOLDER: ./.github/build
 
