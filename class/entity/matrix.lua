@@ -116,9 +116,6 @@ function Matrix:map(func)
 	return mapped
 end
 
----@alias rotation
----| "Clockwise"
----| "CounterClockwise"
 ---@param rot rotation
 function Matrix:getRotation(rot)
 	local matrix = self.matrix
