@@ -47,9 +47,9 @@ jobs:
           name: ${{ env.CORE_LOVE_ARTIFACT_NAME }}
       - name: Add icon to love package
         run: |
-          cp ${{ env.BUILD_ASSETS_FOLDER }}/icon.png media/image/icon.png
-          zip -u ${{ env.CORE_LOVE_PACKAGE_PATH }} media/image/icon.png
-          rm media/image/icon.png
+          cp ${{ env.BUILD_ASSETS_FOLDER }}/icon.png build_icon.png
+          zip -u ${{ env.CORE_LOVE_PACKAGE_PATH }} build_icon.png
+          rm build_icon.png
       - name: Build Linux package
         id: build-packages
         uses: love-actions/love-actions-linux@v2
