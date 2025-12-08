@@ -45,8 +45,11 @@ jobs:
         uses: love-actions/love-actions-linux@v2
         with:
           app-name: ${{ env.APP_NAME }}
+          icon-path: ./.github/build/linux/dev/icon.png
+          love-ref: "11.5"
           love-package: ${{ env.CORE_LOVE_PACKAGE_PATH }}
           output-folder: ${{ env.OUTPUT_FOLDER }}
+          version-string: "alpha-0.1.0"
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
