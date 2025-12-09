@@ -4,22 +4,24 @@ local Keybind = require("class.keybind")
 ---@class Tetris
 ---@field board Board
 ---@field keybinds Keybind[]
+---@field paused boolean
+---@field pausekey Keybind
 local Tetris = {}
 
 function Tetris:new()
 	self.board = Board()
+	self.paused = false
 	self:loadKeybinds()
 	return self
 end
 
 function Tetris:update(dt)
-	self.board:setPosition(
-		love.graphics.getWidth() / 2 - self.board:getWidth() / 2,
-		love.graphics.getHeight() / 2 - self.board:getHeight() / 2
-	)
-	self.board:update(dt)
-	for _, key in ipairs(self.keybinds) do
-		key:update(dt)
+	self.pausekey:update(dt)
+	if not self.paused then
+		for _, key in ipairs(self.keybinds) do
+			key:update(dt)
+		end
+		self.board:update(dt)
 	end
 end
 
@@ -57,34 +59,31 @@ function Tetris:loadKeybinds()
 			self.board:swapHoldPiece()
 		end),
 
-		Keybind("p", function()
-			self.board.nCleared = self.board.nCleared + 1
-			self.board:updateGravity()
-		end, true),
-
 		Keybind("o", function()
 			self.board:init(0)
 		end),
+
+		Keybind("=", function()
+			Audio.volumeUp(0.05)
+			Log:print(Audio.mainVolume)
+		end),
+
+		Keybind("-", function()
+			Audio.volumeDown(0.05)
+			Log:print(Audio.mainVolume)
+		end),
 	}
-end
 
----@param key love.KeyConstant
-function Tetris:keypressed(key)
-	if key == "`" then
-		Log:toggleVisibility()
+	for i = 1, 9 do
+		local kb = Keybind(tostring(i), function()
+			self.board:handleLineClear(i)
+		end)
+		table.insert(self.keybinds, kb)
 	end
 
-	if key == "r" then
-		if love.keyboard.isDown("lctrl") then
-			love.event.quit("restart")
-		else
-			love.load()
-		end
-	end
-
-	if key == "q" then
-		love.event.quit()
-	end
+	self.pausekey = Keybind("p", function()
+		self.paused = not self.paused
+	end)
 end
 
 return Tetris

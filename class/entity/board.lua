@@ -2,17 +2,15 @@ local Matrix = require("class.entity.matrix")
 local Cell = require("class.cell")
 local Tetronimo = require("class.entity.tetronimo").Tetronimo
 local GrabBag = require("class.entity.grabBag")
-local Interval = require("class.interval")
-local Timer = require("class.timer")
+local IntervalCallback = require("class.timer.IntervalCallback")
+local Stopwatch = require("class.timer.Stopwatch")
 local Audio = require("class.AudioManager")
+local Shaker = require("class.animation.Shaker")
 
 local PALETTE = require("constants").PALETTE
 local LOCK_RESET_LIMIT = 16
 local LOCK_DELAY_TIME = 0.5
 local SLAM_FACTOR = Cell.SIZE * 0.35
-local SHAKE_TIME = 0.30
-local SHAKE_FACTOR = 5
-local SHAKE_INT_LENGTH = SHAKE_TIME / 10
 
 ---@class Board: Matrix
 ---@field grabBag GrabBag
@@ -20,18 +18,21 @@ local SHAKE_INT_LENGTH = SHAKE_TIME / 10
 ---@field holdPiece Tetronimo
 ---@field colorMatrix Matrix
 ---@field canHold boolean
+---@field level number
 ---@field nCleared number
----@field fallInterval Interval
----@field shakeInterval Interval
----@field lockDelay Timer
+---@field fallInterval IntervalCallback
+---@field lockDelay Stopwatch
 ---@field lockDelayResets number
+---@field lowestY number
+---@field slamOffset number
+---@field shaker Shaker
 local Board = Matrix:extend()
 Board.super = Matrix
 
 function Board:new()
 	Board.super.new(self, 20, 10, 0)
 	self.colorMatrix = Matrix(self.rows, self.cols, 0)
-	self.slamOffset = 0
+	self.slamOffset = 0.0
 	self.level = 1
 	self.nCleared = 0
 
@@ -40,22 +41,14 @@ function Board:new()
 	self.canHold = true
 	self.lowestY = 0
 
-	self.lockDelay = Timer()
+	self.lockDelay = Stopwatch()
 	self.lockDelayResets = 0
-	self.fallInterval = Interval(0.0, function()
+	self.fallInterval = IntervalCallback(0.0, function()
 		self:moveActive(0, 1)
 	end)
 	self:updateGravity()
 
-	self.shakeAmount = { x = 0, y = 0 }
-	self.shakeTimer = Timer()
-	self.shakeInterval = Interval(SHAKE_INT_LENGTH, function()
-		if self.shakeTimer.running then
-			local buh = (SHAKE_TIME - self.shakeTimer.time) / SHAKE_TIME
-			self.shakeAmount.x = love.math.random(-SHAKE_FACTOR, SHAKE_FACTOR) * buh
-			self.shakeAmount.y = love.math.random(-SHAKE_FACTOR, SHAKE_FACTOR) * buh * 0.1
-		end
-	end, false)
+	self.shaker = Shaker(20, 0.015, 5)
 
 	self:spawnPiece(self.grabBag:takePiece())
 end
@@ -86,30 +79,16 @@ end
 function Board:update(dt)
 	self.fallInterval:update(dt)
 	self.lockDelay:update(dt)
-	self.shakeTimer:update(dt)
-	self.shakeInterval:update(dt)
+	self.shaker:update(dt)
 
 	if self.slamOffset > 0 then
 		self.slamOffset = math.max(0, self.slamOffset - (self.slamOffset * 7.5) * dt)
 	end
 
 	if self.lockDelay.running then
-		if self.lockDelay.time >= LOCK_DELAY_TIME or self.lockDelayResets >= LOCK_RESET_LIMIT then
+		if self.lockDelay:getTime() >= LOCK_DELAY_TIME or self.lockDelayResets >= LOCK_RESET_LIMIT then
 			self.fallInterval:forceTrigger()
 			self:lockPiece()
-		end
-	end
-
-	if self.shakeTimer.running then
-		if not self.shakeInterval.running then
-			self.shakeInterval:start()
-			self.shakeInterval:forceTrigger()
-		end
-		if self.shakeTimer.time >= SHAKE_TIME then
-			self.shakeAmount = { x = 0, y = 0 }
-			self.shakeInterval:stop()
-			self.shakeTimer:stop()
-			self.shakeTimer:reset()
 		end
 	end
 
@@ -124,7 +103,7 @@ function Board:draw()
 	love.graphics.push()
 	do
 		love.graphics.translate(0, self.slamOffset)
-		love.graphics.translate(self.shakeAmount.x, self.shakeAmount.y)
+		self.shaker:draw()
 
 		-- Draw grid
 		love.graphics.setColor(0.2, 0.2, 0.2, 1)
@@ -363,7 +342,7 @@ function Board:tranformActive(transformFunc)
 		self.lockDelay:start()
 		self.lockDelayResets = self.lockDelayResets + 1
 	else
-		self.lockDelay:stop()
+		self.lockDelay:pause()
 	end
 
 	local _, gy = self.activePiece:getGridPosition()
@@ -385,7 +364,6 @@ function Board:lockPiece()
 	end
 	self.canHold = true
 	self.lockDelay:stop()
-	self.lockDelay:reset()
 	self:spawnPiece(self.grabBag:takePiece())
 end
 
@@ -429,8 +407,7 @@ function Board:handleLineClear(nLines)
 
 	local offset = SLAM_FACTOR * (nLines ^ 1.11)
 	self.slamOffset = self.slamOffset + offset
-	self.shakeTimer:reset()
-	self.shakeTimer:start()
+	self.shaker:play()
 end
 
 function Board:getGhost()
