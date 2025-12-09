@@ -7,9 +7,12 @@ local Interval = Timer:extend()
 Interval.super = Timer
 Interval.MAX_EVENTS = 1000
 
-function Interval:new(length, event)
+---@param length number
+---@param event function
+---@param running boolean
+function Interval:new(length, event, running)
 	Interval.super.new(self)
-	self.running = true
+	self.running = running or true
 	self.length = length
 	self.event = event
 end

@@ -9,7 +9,10 @@ local Audio = require("class.AudioManager")
 local PALETTE = require("constants").PALETTE
 local LOCK_RESET_LIMIT = 16
 local LOCK_DELAY_TIME = 0.5
-local SLAM_FACTOR = Cell.SIZE * 0.6
+local SLAM_FACTOR = Cell.SIZE * 0.35
+local SHAKE_TIME = 0.30
+local SHAKE_FACTOR = 5
+local SHAKE_INT_LENGTH = SHAKE_TIME / 10
 
 ---@class Board: Matrix
 ---@field grabBag GrabBag
@@ -19,6 +22,7 @@ local SLAM_FACTOR = Cell.SIZE * 0.6
 ---@field canHold boolean
 ---@field nCleared number
 ---@field fallInterval Interval
+---@field shakeInterval Interval
 ---@field lockDelay Timer
 ---@field lockDelayResets number
 local Board = Matrix:extend()
@@ -27,7 +31,7 @@ Board.super = Matrix
 function Board:new()
 	Board.super.new(self, 20, 10, 0)
 	self.colorMatrix = Matrix(self.rows, self.cols, 0)
-	self.offset = { x = 0, y = 0 }
+	self.slamOffset = 0
 	self.level = 1
 	self.nCleared = 0
 
@@ -43,6 +47,16 @@ function Board:new()
 	end)
 	self:updateGravity()
 
+	self.shakeAmount = { x = 0, y = 0 }
+	self.shakeTimer = Timer()
+	self.shakeInterval = Interval(SHAKE_INT_LENGTH, function()
+		if self.shakeTimer.running then
+			local buh = (SHAKE_TIME - self.shakeTimer.time) / SHAKE_TIME
+			self.shakeAmount.x = love.math.random(-SHAKE_FACTOR, SHAKE_FACTOR) * buh
+			self.shakeAmount.y = love.math.random(-SHAKE_FACTOR, SHAKE_FACTOR) * buh * 0.1
+		end
+	end, false)
+
 	self:spawnPiece(self.grabBag:takePiece())
 end
 
@@ -57,6 +71,7 @@ function Board:spawnPiece(tetronimo)
 		y = 0
 	end
 	self.activePiece:setGridPosition(x, y)
+	self:moveActive(0, 0)
 
 	for _, cell in ipairs(self.activePiece:getCellGridPositions()) do
 		if self:getCell(cell.x, cell.y) ~= Cell.STATE.EMPTY then
@@ -66,23 +81,35 @@ function Board:spawnPiece(tetronimo)
 
 	self.lowestY = y
 	self.lockDelayResets = 0
-	self.lockDelay:stop()
-	self.lockDelay:reset()
 end
 
 function Board:update(dt)
 	self.fallInterval:update(dt)
 	self.lockDelay:update(dt)
+	self.shakeTimer:update(dt)
+	self.shakeInterval:update(dt)
 
-	if self.offset.x > 0 or self.offset.y > 0 then
-		self.offset.x = math.max(0, self.offset.x - self.offset.x * 10 * dt)
-		self.offset.y = math.max(0, self.offset.y - (self.offset.y ^ 2) * 1.5 * dt)
+	if self.slamOffset > 0 then
+		self.slamOffset = math.max(0, self.slamOffset - (self.slamOffset * 7.5) * dt)
 	end
 
 	if self.lockDelay.running then
 		if self.lockDelay.time >= LOCK_DELAY_TIME or self.lockDelayResets >= LOCK_RESET_LIMIT then
 			self.fallInterval:forceTrigger()
 			self:lockPiece()
+		end
+	end
+
+	if self.shakeTimer.running then
+		if not self.shakeInterval.running then
+			self.shakeInterval:start()
+			self.shakeInterval:forceTrigger()
+		end
+		if self.shakeTimer.time >= SHAKE_TIME then
+			self.shakeAmount = { x = 0, y = 0 }
+			self.shakeInterval:stop()
+			self.shakeTimer:stop()
+			self.shakeTimer:reset()
 		end
 	end
 
@@ -96,7 +123,8 @@ function Board:draw()
 
 	love.graphics.push()
 	do
-		love.graphics.translate(self.offset.x, self.offset.y)
+		love.graphics.translate(0, self.slamOffset)
+		love.graphics.translate(self.shakeAmount.x, self.shakeAmount.y)
 
 		-- Draw grid
 		love.graphics.setColor(0.2, 0.2, 0.2, 1)
@@ -197,7 +225,6 @@ function Board:draw()
 			love.graphics.getFont():getHeight() / 2
 		)
 		love.graphics.setNewFont()
-		-- love.graphics.print("YOU LOSE BITCH!!!")
 	end
 end
 
@@ -207,6 +234,10 @@ end
 
 function Board:getHeight()
 	return self.rows * Cell.SIZE
+end
+
+function Board:getDimensions()
+	return self:getWidth(), self:getHeight()
 end
 
 ---@param x number
@@ -292,6 +323,15 @@ function Board:moveActive(x, y, playSound)
 			Audio.sfx.xMove:clone():play()
 		elseif playSound and y ~= 0 then
 			Audio.sfx.softDrop:clone():play()
+			--[[
+			local s = Audio.sfx.softDrop:clone()
+			local _, ty = self.activePiece:getGridPosition()
+			local min, max = 0.9, 1.1
+			local pitch = ((self.rows - ty) / self.rows) * (max - min) + min
+			Log:print(pitch)
+			s:setPitch(pitch)
+			s:play()
+			--]]
 		end
 	end
 	return canMove
@@ -344,6 +384,8 @@ function Board:lockPiece()
 		self.colorMatrix:setCell(cell.x, cell.y, self.activePiece.color)
 	end
 	self.canHold = true
+	self.lockDelay:stop()
+	self.lockDelay:reset()
 	self:spawnPiece(self.grabBag:takePiece())
 end
 
@@ -369,11 +411,26 @@ function Board:clearFullLines()
 		end
 	end
 	if linesCleared > 0 then
-		self.nCleared = self.nCleared + linesCleared
-		self:updateGravity()
+		self:handleLineClear(linesCleared)
 	end
-	self.level = self:getLevel()
 	return linesCleared > 0
+end
+
+function Board:handleLineClear(nLines)
+	self.nCleared = self.nCleared + nLines
+	self:updateGravity()
+
+	local lvl = self:getLevel()
+	if lvl > self.level then
+		self.level = lvl
+		Audio.sfx.nextLevel:play()
+	end
+	Audio.sfx.lineClear:clone():play()
+
+	local offset = SLAM_FACTOR * (nLines ^ 1.11)
+	self.slamOffset = self.slamOffset + offset
+	self.shakeTimer:reset()
+	self.shakeTimer:start()
 end
 
 function Board:getGhost()
@@ -417,7 +474,8 @@ function Board:hardDrop()
 	self.activePiece = self:getGhost()
 	self:lockPiece()
 	Audio.sfx.hardDrop:clone():play()
-	self.offset.y = self.offset.y + SLAM_FACTOR
+	Audio.sfx.touchGround:play()
+	self.slamOffset = self.slamOffset + SLAM_FACTOR
 end
 
 function Board:getLevel()
