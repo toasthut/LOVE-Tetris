@@ -212,7 +212,6 @@ function Tetronimo.getKicks(rot, targetDeg)
 end
 
 Tetronimo.KICKS = Tetronimo.generateKicks()
-print(util.tableToString(Tetronimo.KICKS, "Kicks"))
 
 return {
 	Tetronimo = Tetronimo,

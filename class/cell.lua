@@ -5,6 +5,8 @@ Cell.STATE = {
 	EMPTY = 0,
 	FULL = 1,
 }
+local INNER_SIZE = Cell.SIZE / 2.5
+local INNER_OFFSET = Cell.SIZE / 2 - INNER_SIZE / 2
 
 function Cell:draw(x, y, color)
 	local darker = {}
@@ -18,9 +20,7 @@ function Cell:draw(x, y, color)
 	love.graphics.setColor(darker)
 	love.graphics.rectangle("line", x, y, Cell.SIZE, Cell.SIZE)
 
-	local smallCell = Cell.SIZE / 2.5
-	local offset = Cell.SIZE / 2 - smallCell / 2
-	love.graphics.rectangle("fill", x + offset, y + offset, smallCell, smallCell)
+	love.graphics.rectangle("fill", x + INNER_OFFSET, y + INNER_OFFSET, INNER_SIZE, INNER_SIZE)
 end
 
 return Cell
