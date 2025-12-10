@@ -10,7 +10,28 @@ local Shaker = require("class.animation.Shaker")
 local PALETTE = require("constants").PALETTE
 local LOCK_RESET_LIMIT = 16
 local LOCK_DELAY_TIME = 0.5
-local SLAM_FACTOR = Cell.SIZE * 0.35
+
+-- Precalculated math
+---@type table<number, number>
+local SLAM_MAGNITUDE = (function()
+	local SLAM_FACTOR = Cell.SIZE * 0.35
+	local t = {}
+	for i = 1, 9 do
+		local v = SLAM_FACTOR * (i ^ 1.11)
+		t[i] = v
+	end
+	return t
+end)()
+
+---@type table<number, number>
+local GRAVITY_MAGNITUDE = (function()
+	local t = {}
+	for i = 1, 20 do
+		local v = (0.8 - ((i - 1) * 0.007)) ^ (i - 1)
+		t[i] = v
+	end
+	return t
+end)()
 
 ---@class Board: Matrix
 ---@field grabBag GrabBag
@@ -82,7 +103,7 @@ function Board:update(dt)
 	self.shaker:update(dt)
 
 	if self.slamOffset > 0 then
-		self.slamOffset = math.max(0, self.slamOffset - (self.slamOffset * 7.5) * dt)
+		self.slamOffset = math.max(0, self.slamOffset - self.slamOffset * (7.5 * dt))
 	end
 
 	if self.lockDelay.running then
@@ -405,7 +426,7 @@ function Board:handleLineClear(nLines)
 	end
 	Audio.sfx.lineClear:clone():play()
 
-	local offset = SLAM_FACTOR * (nLines ^ 1.11)
+	local offset = SLAM_MAGNITUDE[nLines]
 	self.slamOffset = self.slamOffset + offset
 	self.shaker:play()
 end
@@ -452,7 +473,7 @@ function Board:hardDrop()
 	self:lockPiece()
 	Audio.sfx.hardDrop:clone():play()
 	Audio.sfx.touchGround:play()
-	self.slamOffset = self.slamOffset + SLAM_FACTOR
+	self.slamOffset = self.slamOffset + SLAM_MAGNITUDE[1]
 end
 
 function Board:getLevel()
@@ -460,8 +481,8 @@ function Board:getLevel()
 end
 
 function Board:updateGravity()
-	local a = math.min(self:getLevel(), 20) - 1
-	local len = (0.8 - (a * 0.007)) ^ a
+	local lvl = math.min(self:getLevel(), 20)
+	local len = GRAVITY_MAGNITUDE[lvl]
 	self.fallInterval:setLength(len)
 end
 
