@@ -1,14 +1,14 @@
 local util = {}
 
 function util.contains(iterable, target)
-	local contains = false
+	local pos = 0
 	for i = 0, #iterable do
 		if iterable[i] == target then
-			contains = true
+			pos = i
 			break
 		end
 	end
-	return contains
+	return pos
 end
 
 ---@param t table
@@ -19,6 +19,18 @@ function util.keys(t)
 		table.insert(keys, k)
 	end
 	return keys
+end
+
+---@param t table
+---@return table
+function util.findAll(t, value)
+	local filtered = {}
+	for k, v in pairs(t) do
+		if v == value then
+			filtered[k] = v
+		end
+	end
+	return filtered
 end
 
 ---@param s string

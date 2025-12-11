@@ -13,7 +13,7 @@ local function newSource(src, vol, srcType)
 end
 
 AudioManager.sfx = {
-	xMove = newSource("blip3.wav", 1.0),
+	xAxisMove = newSource("blip3.wav", 1.0),
 	rotate = newSource("blip3_2.wav", 0.7),
 	softDrop = newSource("blip4.wav", 0.8),
 	hardDrop = newSource("clap3.wav", 0.55),
@@ -21,6 +21,7 @@ AudioManager.sfx = {
 	holdPiece = newSource("clup2.wav", 0.8),
 	lineClear = newSource("splode2.wav", 0.4),
 	nextLevel = newSource("levelup1.wav", 0.8),
+	twist = newSource("basket1.wav", 1.0),
 }
 
 function AudioManager.volumeUp(n)
