@@ -138,18 +138,14 @@ function Tetronimo:rotate(rot)
 	end
 end
 
-function Tetronimo:getCellGridPositions()
-	local tx, ty = self:getGridPosition()
-
-	local cells = self:map(function(mx, my, v)
-		if v == Cell.STATE.FULL then
-			local x = tx + mx - 1
-			local y = ty + my - 1
-			return { x = x, y = y }
-		end
+---@param func function
+function Tetronimo:forEachGridPosition(func)
+	local gx, gy = self:getGridPosition()
+	return self:forEach(function(rx, ry, v)
+		local x = gx + rx - 1
+		local y = gy + ry - 1
+		func(x, y, v)
 	end)
-
-	return cells
 end
 
 ---@return Tetronimo

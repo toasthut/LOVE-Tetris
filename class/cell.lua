@@ -4,6 +4,7 @@ Cell.SIZE = 24
 Cell.STATE = {
 	EMPTY = 0,
 	FULL = 1,
+	OOB = -1,
 }
 local INNER_SIZE = Cell.SIZE / 2.5
 local INNER_OFFSET = Cell.SIZE / 2 - INNER_SIZE / 2

@@ -45,15 +45,15 @@ end)()
 ---@field lockDelay Stopwatch
 ---@field lockDelayResets number
 ---@field lowestY number
----@field slamOffset number
 ---@field shaker Shaker
+---@field slamOffset number
+---@field rotationTheta number
 local Board = Matrix:extend()
 Board.super = Matrix
 
 function Board:new()
 	Board.super.new(self, 20, 10, 0)
 	self.colorMatrix = Matrix(self.rows, self.cols, 0)
-	self.slamOffset = 0.0
 	self.level = 1
 	self.nCleared = 0
 
@@ -70,6 +70,8 @@ function Board:new()
 	self:updateGravity()
 
 	self.shaker = Shaker(20, 0.015, 5)
+	self.slamOffset = 0.0
+	self.rotationTheta = 0.0
 
 	self:spawnPiece(self.grabBag:takePiece())
 end
@@ -87,14 +89,26 @@ function Board:spawnPiece(tetronimo)
 	self.activePiece:setGridPosition(x, y)
 	self:moveActive(0, 0)
 
-	for _, cell in ipairs(self.activePiece:getCellGridPositions()) do
-		if self:getCell(cell.x, cell.y) ~= Cell.STATE.EMPTY then
-			self.gameover = true
+	self.activePiece:forEachGridPosition(function(gx, gy, v)
+		if v == Cell.STATE.FULL then
+			local cellState = self:getCell(gx, gy)
+			if cellState == Cell.STATE.FULL then
+				self.gameover = true
+				return
+			end
 		end
-	end
+	end)
 
 	self.lowestY = y
 	self.lockDelayResets = 0
+end
+
+function Board:getCell(x, y)
+	local v = self.super.getCell(self, x, y)
+	if v == nil then
+		v = -1
+	end
+	return v
 end
 
 function Board:update(dt)
@@ -102,8 +116,19 @@ function Board:update(dt)
 	self.lockDelay:update(dt)
 	self.shaker:update(dt)
 
-	if self.slamOffset > 0 then
+	if self.slamOffset > 0.01 then
 		self.slamOffset = math.max(0, self.slamOffset - self.slamOffset * (7.5 * dt))
+	else
+		self.slamOffset = 0
+	end
+
+	if self.rotationTheta > 0.001 then
+		self.rotationTheta = math.max(0, self.rotationTheta - self.rotationTheta * (7.5 * dt))
+	elseif self.rotationTheta < 0.001 then
+		self.rotationTheta = math.min(0, self.rotationTheta - self.rotationTheta * (7.5 * dt))
+	end
+	if self.rotationTheta ~= 0 and (self.rotationTheta < 0.001 and self.rotationTheta > -0.001) then
+		self.rotationTheta = 0
 	end
 
 	if self.lockDelay.running then
@@ -112,86 +137,113 @@ function Board:update(dt)
 			self:lockPiece()
 		end
 	end
-
-	self:clearFullLines()
 end
 
 function Board:draw()
-	love.graphics.push()
-	love.graphics.translate(self.x, self.y)
+	local canvas = love.graphics.newCanvas()
 	local left, right, top, bottom = 0, self:getWidth(), 0, self:getHeight()
-
-	love.graphics.push()
 	do
-		love.graphics.translate(0, self.slamOffset)
-		self.shaker:draw()
+		love.graphics.push()
+		love.graphics.translate(self.x, self.y)
 
-		-- Draw grid
-		love.graphics.setColor(0.2, 0.2, 0.2, 1)
-		self:forEach(function(mx, my)
-			local x = (mx - 1) * Cell.SIZE
-			local y = (my - 1) * Cell.SIZE
-			love.graphics.rectangle("line", x, y, Cell.SIZE, Cell.SIZE)
-		end)
+		-- Render main board
+		do
+			love.graphics.push()
+			love.graphics.setCanvas(canvas)
+			love.graphics.translate(0, self.slamOffset)
+			self.shaker:draw()
 
-		-- Draw filled cells
-		self:forEach(function(mx, my, v)
-			local x = (mx - 1) * Cell.SIZE
-			local y = (my - 1) * Cell.SIZE
-			if v == Cell.STATE.FULL then
-				local color = self.colorMatrix:getCell(mx, my)
-				assert(type(color) == "table", string.format("Color matrix value at {%d,%d} is not a table", mx, my))
-				Cell:draw(x, y, color)
-			end
-		end)
+			-- Draw progress bar background
+			local r, g, b = unpack(PALETTE.dusk)
+			love.graphics.setColor(r, g, b, 0.14)
+			local progress = (self.nCleared % 10)
+			local progressHeight = progress / 10 * self:getHeight()
+			local progressY = (10 - progress) * 2 * Cell.SIZE
+			love.graphics.rectangle("fill", 0, progressY, self:getWidth(), progressHeight)
 
-		-- Draw active piece & ghost
-		local ghost = self:getGhost()
-		ghost.color = PALETTE.cloud
-		ghost.color[4] = 0.2
-		ghost:draw()
-		self.activePiece:draw()
+			-- Draw grid
+			love.graphics.setColor(0.2, 0.2, 0.2, 1)
+			self:forEach(function(mx, my)
+				local x = (mx - 1) * Cell.SIZE
+				local y = (my - 1) * Cell.SIZE
+				love.graphics.rectangle("line", x, y, Cell.SIZE, Cell.SIZE)
+			end)
 
-		-- Draw edges
-		love.graphics.setColor(1, 1, 1, 1)
-		love.graphics.line(left, top, left, bottom)
-		love.graphics.line(right, top, right, bottom)
-		love.graphics.line(left, bottom, right, bottom)
-	end
-	love.graphics.pop()
+			-- Draw filled cells
+			self:forEach(function(mx, my, v)
+				local x = (mx - 1) * Cell.SIZE
+				local y = (my - 1) * Cell.SIZE
+				if v == Cell.STATE.FULL then
+					local color = self.colorMatrix:getCell(mx, my)
+					assert(
+						type(color) == "table",
+						string.format("Color matrix value at {%d,%d} is not a table", mx, my)
+					)
+					Cell:draw(x, y, color)
+				end
+			end)
 
-	-- Draw score
-	love.graphics.print("LEVEL: " .. self.level, 0, -40)
-	love.graphics.print("LINES CLEARED: " .. self.nCleared, 0, -20)
+			-- Draw active piece & ghost
+			local ghost = self:getGhost()
+			ghost.color = PALETTE.cloud
+			ghost.color[4] = 0.2
+			ghost:draw()
+			self.activePiece:draw()
 
-	-- Draw held piece
-	love.graphics.push()
-	do
-		love.graphics.translate(-Cell.SIZE * 6.5, Cell.SIZE * 1)
-		love.graphics.print("HOLD", 0, -20)
-		local w = Cell.SIZE * 5.5
-		local h = Cell.SIZE * 3.5
-		love.graphics.rectangle("line", 0, 0, w, h)
-		if self.holdPiece ~= nil then
-			local t = self.holdPiece
-			local x = (w / 2) - (t.cols * Cell.SIZE / 2)
-			local y = (h / 2) - (t.rows * Cell.SIZE / 2)
-			t:setPosition(x, y)
-			t:draw()
+			-- Draw edges
+			love.graphics.setColor(1, 1, 1, 1)
+			love.graphics.line(left, top, left, bottom)
+			love.graphics.line(right, top, right, bottom)
+			love.graphics.line(left, bottom, right, bottom)
+			love.graphics.setCanvas()
+			love.graphics.pop()
 		end
-	end
-	love.graphics.pop()
 
-	-- Draw next pieces
+		-- Draw score
+		love.graphics.print("LEVEL: " .. self.level, 0, -40)
+		love.graphics.print("LINES CLEARED: " .. self.nCleared, 0, -20)
+
+		-- Draw held piece
+		do
+			love.graphics.push()
+			love.graphics.translate(-Cell.SIZE * 6.5, Cell.SIZE * 1)
+			love.graphics.print("HOLD", 0, -20)
+			local w = Cell.SIZE * 5.5
+			local h = Cell.SIZE * 3.5
+			love.graphics.rectangle("line", 0, 0, w, h)
+			if self.holdPiece ~= nil then
+				local t = self.holdPiece
+				local x = (w / 2) - (t.cols * Cell.SIZE / 2)
+				local y = (h / 2) - (t.rows * Cell.SIZE / 2)
+				t:setPosition(x, y)
+				t:draw()
+			end
+			love.graphics.pop()
+		end
+
+		-- Draw next pieces
+		do
+			love.graphics.push()
+			love.graphics.translate(self:getWidth() + Cell.SIZE * 1.5, 0)
+			self.grabBag:draw()
+			love.graphics.pop()
+		end
+
+		love.graphics.pop()
+	end
+
+	-- Draw main board
 	love.graphics.push()
-	do
-		love.graphics.translate(self:getWidth() + Cell.SIZE * 1.5, 0)
-		self.grabBag:draw()
-	end
+	love.graphics.setColor(1, 1, 1, 1)
+	love.graphics.setBlendMode("alpha", "premultiplied")
+	local w, h = love.graphics.getDimensions()
+	love.graphics.translate(w / 2, h / 2)
+	love.graphics.rotate(self.rotationTheta)
+	love.graphics.draw(canvas, -w / 2, -h / 2)
+	love.graphics.setBlendMode("alpha")
 	love.graphics.pop()
 
-	love.graphics.pop()
-
+	-- Draw gameover text
 	if self.gameover then
 		local text = "GAME OVER"
 		local color = { love.graphics.getColor() }
@@ -244,39 +296,19 @@ end
 ---@param y number
 ---@param t Tetronimo
 function Board:checkMove(x, y, t)
-	local activeCells = t:getCellGridPositions()
-	for _, cell in ipairs(activeCells) do
-		-- Process position to move to
-		local nx = cell.x + x
-		local ny = cell.y + y
-
-		-- Check if position is OOB
-		if nx < 1 or nx > self.cols or ny > self.rows then
-			return false
+	local isValid = true
+	t:forEachGridPosition(function(gx, gy, v)
+		if v == Cell.STATE.FULL then
+			local nx = gx + x
+			local ny = gy + y
+			-- Check if position is not empty
+			if self:getCell(nx, ny) ~= Cell.STATE.EMPTY then
+				isValid = false
+				return
+			end
 		end
-		-- Check if position is not empty
-		if self:getCell(nx, ny) ~= 0 then
-			return false
-		end
-	end
-	return true
-end
-
----@param rot rotation
-function Board:checkRotation(rot)
-	local t = self.activePiece
-	local testPiece = t:copy()
-	testPiece:rotate(rot)
-
-	local activeCells = testPiece:getCellGridPositions()
-
-	for _, cell in ipairs(activeCells) do
-		local state = self:getCell(cell.x, cell.y)
-		if state == Cell.STATE.FULL or state == nil then
-			return false
-		end
-	end
-	return true
+	end)
+	return isValid
 end
 
 ---@param rot rotation
@@ -286,7 +318,13 @@ function Board:findRotationPosition(rot)
 
 	local t = self.activePiece:copy()
 	t:rotate(rot)
-	local tCells = t:getCellGridPositions()
+
+	local tCells = {}
+	t:forEachGridPosition(function(gx, gy, v)
+		if v == Cell.STATE.FULL then
+			table.insert(tCells, { x = gx, y = gy })
+		end
+	end)
 
 	local degRotated = t.degreesRotated
 	local kickList = Tetronimo.KICKS[rot][tostring(degRotated)]
@@ -294,9 +332,9 @@ function Board:findRotationPosition(rot)
 	for i = 1, #kickList do
 		isValidPosition = true
 		for _, cell in ipairs(tCells) do
-			local kx, ky = kickList[i][1], kickList[i][2]
+			local kx, ky = unpack(kickList[i])
 			local state = self:getCell(cell.x + kx, cell.y + ky)
-			if state == Cell.STATE.FULL or state == nil then
+			if state ~= Cell.STATE.EMPTY then
 				isValidPosition = false
 				break
 			end
@@ -320,7 +358,7 @@ function Board:moveActive(x, y, playSound)
 			return self.activePiece:move(x, y)
 		end)
 		if playSound and x ~= 0 then
-			Audio.sfx.xMove:clone():play()
+			Audio.sfx.xAxisMove:clone():play()
 		elseif playSound and y ~= 0 then
 			Audio.sfx.softDrop:clone():play()
 			--[[
@@ -341,13 +379,54 @@ end
 ---@return boolean
 function Board:rotateActive(rot)
 	local pos = self:findRotationPosition(rot)
-	if pos then
-		self:tranformActive(function()
-			local x, y = pos[1], pos[2]
-			self.activePiece:move(x, y)
-			self.activePiece:rotate(rot)
-		end)
-		Audio.sfx.rotate:clone():play()
+	if not pos then
+		return false
+	end
+	self:tranformActive(function()
+		local x, y = pos[1], pos[2]
+		self.activePiece:move(x, y)
+		self.activePiece:rotate(rot)
+	end)
+	Audio.sfx.rotate:clone():play()
+
+	-- Check for twists
+	if util.contains({ "O", "I" }, self.activePiece.shape) ~= 0 then
+		return pos
+	end
+
+	local isTwist = false
+	if self.activePiece.shape ~= "T" then
+		isTwist = not (
+			self:checkMove(0, -1, self.activePiece)
+			or self:checkMove(-1, 0, self.activePiece)
+			or self:checkMove(1, 0, self.activePiece)
+		)
+	else
+		local x, y = self.activePiece:getGridPosition()
+		local corners = {
+			self:getCell(x, y), -- top left
+			self:getCell(x + 2, y), -- top right
+			self:getCell(x + 2, y + 2), -- bottom right
+			self:getCell(x, y + 2), -- bottom left
+		}
+
+		local nFull = 0
+		for i = 1, 4 do
+			if corners[i] ~= Cell.STATE.EMPTY then
+				nFull = nFull + 1
+			end
+		end
+		isTwist = nFull >= 3
+	end
+
+	if isTwist then
+		Audio.sfx.twist:clone():play()
+		local rotationFactor = 0.02
+		if rot == "Clockwise" then
+			self.rotationTheta = rotationFactor
+		elseif rot == "CounterClockwise" then
+			self.rotationTheta = -rotationFactor
+		end
 	end
 	return pos
 end
@@ -379,12 +458,15 @@ function Board:tranformActive(transformFunc)
 end
 
 function Board:lockPiece()
-	for _, cell in ipairs(self.activePiece:getCellGridPositions()) do
-		self:setCell(cell.x, cell.y, Cell.STATE.FULL)
-		self.colorMatrix:setCell(cell.x, cell.y, self.activePiece.color)
-	end
+	self.activePiece:forEachGridPosition(function(x, y, v)
+		if v == Cell.STATE.FULL then
+			self:setCell(x, y, v)
+			self.colorMatrix:setCell(x, y, self.activePiece.color)
+		end
+	end)
 	self.canHold = true
 	self.lockDelay:stop()
+	self:clearFullLines()
 	self:spawnPiece(self.grabBag:takePiece())
 end
 
