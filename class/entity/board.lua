@@ -53,6 +53,7 @@ Board.super = Matrix
 
 function Board:new()
 	Board.super.new(self, 20, 10, 0)
+	self.boardCanvas = love.graphics.newCanvas()
 	self.colorMatrix = Matrix(self.rows, self.cols, 0)
 	self.level = 1
 	self.nCleared = 0
@@ -140,7 +141,7 @@ function Board:update(dt)
 end
 
 function Board:draw()
-	local canvas = love.graphics.newCanvas()
+	local prevCanvas = love.graphics.getCanvas()
 	local left, right, top, bottom = 0, self:getWidth(), 0, self:getHeight()
 	do
 		love.graphics.push()
@@ -149,7 +150,8 @@ function Board:draw()
 		-- Render main board
 		do
 			love.graphics.push()
-			love.graphics.setCanvas(canvas)
+			love.graphics.setCanvas(self.boardCanvas)
+			love.graphics.clear()
 			love.graphics.translate(0, self.slamOffset)
 			self.shaker:draw()
 
@@ -195,7 +197,7 @@ function Board:draw()
 			love.graphics.line(left, top, left, bottom)
 			love.graphics.line(right, top, right, bottom)
 			love.graphics.line(left, bottom, right, bottom)
-			love.graphics.setCanvas()
+			love.graphics.setCanvas(prevCanvas)
 			love.graphics.pop()
 		end
 
@@ -239,7 +241,7 @@ function Board:draw()
 	local w, h = love.graphics.getDimensions()
 	love.graphics.translate(w / 2, h / 2)
 	love.graphics.rotate(self.rotationTheta)
-	love.graphics.draw(canvas, -w / 2, -h / 2)
+	love.graphics.draw(self.boardCanvas, -w / 2, -h / 2)
 	love.graphics.setBlendMode("alpha")
 	love.graphics.pop()
 

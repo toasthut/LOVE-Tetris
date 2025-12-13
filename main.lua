@@ -12,7 +12,6 @@ local LIMIT_FPS = false
 local dt_accum = 0.0
 local targetFPS = 24
 local min_dt = 1 / targetFPS
-local min_dt_x2 = min_dt * 2
 local doDraw = true
 local canvas = love.graphics.newCanvas(2560, 1440)
 
@@ -55,7 +54,7 @@ function love.update(dt)
 	dt_accum = dt_accum + dt
 	if dt_accum >= min_dt then
 		dt_accum = dt_accum - min_dt
-		if dt_accum > min_dt_x2 then
+		if dt_accum > (min_dt * 2) then
 			dt_accum = min_dt
 		end
 		doDraw = true
