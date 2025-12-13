@@ -1,6 +1,9 @@
 local Entity = require("class.entity.entity")
 local TetShapes = require("class.entity.tetronimo").TetShapes
 local Tetronimo = require("class.entity.tetronimo").Tetronimo
+local Cell = require("class.cell")
+
+local ANIMATION_SPEED = 20
 
 ---@class GrabBag
 local GrabBag = Entity:extend()
@@ -8,6 +11,7 @@ local GrabBag = Entity:extend()
 function GrabBag:new()
 	self.bag = self:newGrabBag()
 	self.nextBag = self:newGrabBag()
+	self.slideOffset = 0
 end
 
 function GrabBag:newGrabBag()
@@ -23,12 +27,19 @@ function GrabBag:newGrabBag()
 	return bag
 end
 
+---@param doAnimation? boolean
 ---@return Tetronimo
-function GrabBag:takePiece()
+function GrabBag:takePiece(doAnimation)
+	if doAnimation == nil then
+		doAnimation = true
+	end
 	local piece = table.remove(self.bag, 1)
 	if #self.bag == 0 then
 		self.bag = self.nextBag
 		self.nextBag = self:newGrabBag()
+	end
+	if doAnimation then
+		self.slideOffset = Cell.SIZE * 3
 	end
 	return Tetronimo(piece)
 end
@@ -44,10 +55,21 @@ function GrabBag:getPieceList()
 	return list
 end
 
+function GrabBag:update(dt)
+	if self.slideOffset > 0.01 then
+		self.slideOffset = self.slideOffset - self.slideOffset * (ANIMATION_SPEED * dt)
+	else
+		self.slideOffset = 0
+	end
+end
+
 function GrabBag:draw()
 	love.graphics.push()
 	love.graphics.setColor(1, 1, 1, 1)
 	love.graphics.print("NEXT")
+	if self.slideOffset > 0 then
+		love.graphics.translate(0, self.slideOffset)
+	end
 	local pieceList = self:getPieceList()
 	for i = 1, 6 do
 		---@type Tetronimo

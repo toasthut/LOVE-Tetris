@@ -48,6 +48,7 @@ end)()
 ---@field shaker Shaker
 ---@field slamOffset number
 ---@field rotationTheta number
+---@field rendered table<string,love.Canvas>
 local Board = Matrix:extend()
 Board.super = Matrix
 
@@ -74,7 +75,15 @@ function Board:new()
 	self.slamOffset = 0.0
 	self.rotationTheta = 0.0
 
-	self:spawnPiece(self.grabBag:takePiece())
+	-- Prerender static elements
+	self.rendered = {
+		grid = self:renderGrid(),
+		edges = self:renderEdges(),
+		holdUI = self:renderHoldUI(),
+		gameover = self:renderGameover(),
+	}
+
+	self:spawnPiece(self.grabBag:takePiece(false))
 end
 
 ---@param tetronimo Tetronimo
@@ -104,18 +113,11 @@ function Board:spawnPiece(tetronimo)
 	self.lockDelayResets = 0
 end
 
-function Board:getCell(x, y)
-	local v = self.super.getCell(self, x, y)
-	if v == nil then
-		v = -1
-	end
-	return v
-end
-
 function Board:update(dt)
 	self.fallInterval:update(dt)
 	self.lockDelay:update(dt)
 	self.shaker:update(dt)
+	self.grabBag:update(dt)
 
 	if self.slamOffset > 0.01 then
 		self.slamOffset = math.max(0, self.slamOffset - self.slamOffset * (7.5 * dt))
@@ -142,7 +144,6 @@ end
 
 function Board:draw()
 	local prevCanvas = love.graphics.getCanvas()
-	local left, right, top, bottom = 0, self:getWidth(), 0, self:getHeight()
 	do
 		love.graphics.push()
 		love.graphics.translate(self.x, self.y)
@@ -164,12 +165,10 @@ function Board:draw()
 			love.graphics.rectangle("fill", 0, progressY, self:getWidth(), progressHeight)
 
 			-- Draw grid
-			love.graphics.setColor(0.2, 0.2, 0.2, 1)
-			self:forEach(function(mx, my)
-				local x = (mx - 1) * Cell.SIZE
-				local y = (my - 1) * Cell.SIZE
-				love.graphics.rectangle("line", x, y, Cell.SIZE, Cell.SIZE)
-			end)
+			love.graphics.setColor(1, 1, 1)
+			love.graphics.setBlendMode("alpha", "premultiplied")
+			love.graphics.draw(self.rendered.grid)
+			love.graphics.setBlendMode("alpha")
 
 			-- Draw filled cells
 			self:forEach(function(mx, my, v)
@@ -193,10 +192,11 @@ function Board:draw()
 			self.activePiece:draw()
 
 			-- Draw edges
-			love.graphics.setColor(1, 1, 1, 1)
-			love.graphics.line(left, top, left, bottom)
-			love.graphics.line(right, top, right, bottom)
-			love.graphics.line(left, bottom, right, bottom)
+			love.graphics.setColor(1, 1, 1)
+			love.graphics.setBlendMode("alpha", "premultiplied")
+			love.graphics.draw(self.rendered.edges)
+			love.graphics.setBlendMode("alpha")
+
 			love.graphics.setCanvas(prevCanvas)
 			love.graphics.pop()
 		end
@@ -209,10 +209,14 @@ function Board:draw()
 		do
 			love.graphics.push()
 			love.graphics.translate(-Cell.SIZE * 6.5, Cell.SIZE * 1)
-			love.graphics.print("HOLD", 0, -20)
 			local w = Cell.SIZE * 5.5
 			local h = Cell.SIZE * 3.5
-			love.graphics.rectangle("line", 0, 0, w, h)
+
+			love.graphics.setColor(1, 1, 1)
+			love.graphics.setBlendMode("alpha", "premultiplied")
+			love.graphics.draw(self.rendered.holdUI, 0, -20)
+			love.graphics.setBlendMode("alpha")
+
 			if self.holdPiece ~= nil then
 				local t = self.holdPiece
 				local x = (w / 2) - (t.cols * Cell.SIZE / 2)
@@ -237,16 +241,62 @@ function Board:draw()
 	-- Draw main board
 	love.graphics.push()
 	love.graphics.setColor(1, 1, 1, 1)
-	love.graphics.setBlendMode("alpha", "premultiplied")
 	local w, h = love.graphics.getDimensions()
 	love.graphics.translate(w / 2, h / 2)
 	love.graphics.rotate(self.rotationTheta)
+	love.graphics.setBlendMode("alpha", "premultiplied")
 	love.graphics.draw(self.boardCanvas, -w / 2, -h / 2)
 	love.graphics.setBlendMode("alpha")
 	love.graphics.pop()
 
 	-- Draw gameover text
 	if self.gameover then
+		love.graphics.setColor(1, 1, 1)
+		love.graphics.setBlendMode("alpha", "premultiplied")
+		love.graphics.draw(self.rendered.gameover)
+		love.graphics.setBlendMode("alpha")
+	end
+end
+
+function Board:renderGrid()
+	local c = love.graphics.newCanvas()
+	c:renderTo(function()
+		love.graphics.setColor(0.2, 0.2, 0.2, 1)
+		self:forEach(function(mx, my)
+			local x = (mx - 1) * Cell.SIZE
+			local y = (my - 1) * Cell.SIZE
+			love.graphics.rectangle("line", x, y, Cell.SIZE, Cell.SIZE)
+		end)
+	end)
+	return c
+end
+
+function Board:renderEdges()
+	local c = love.graphics.newCanvas()
+	c:renderTo(function()
+		local left, right, top, bottom = 0, self:getWidth(), 0, self:getHeight()
+		love.graphics.setColor(1, 1, 1, 1)
+		love.graphics.line(left, top, left, bottom)
+		love.graphics.line(right, top, right, bottom)
+		love.graphics.line(left, bottom, right, bottom)
+	end)
+	return c
+end
+
+function Board:renderHoldUI()
+	local c = love.graphics.newCanvas()
+	c:renderTo(function()
+		love.graphics.print("HOLD", 0, 0)
+		local w = Cell.SIZE * 5.5
+		local h = Cell.SIZE * 3.5
+		love.graphics.rectangle("line", 0, 20, w, h)
+	end)
+	return c
+end
+
+function Board:renderGameover()
+	local c = love.graphics.newCanvas()
+	c:renderTo(function()
 		local text = "GAME OVER"
 		local color = { love.graphics.getColor() }
 		love.graphics.setColor(0.1, 0.1, 0.1)
@@ -279,7 +329,16 @@ function Board:draw()
 			love.graphics.getFont():getHeight() / 2
 		)
 		love.graphics.setNewFont()
+	end)
+	return c
+end
+
+function Board:getCell(x, y)
+	local v = self.super.getCell(self, x, y)
+	if v == nil then
+		v = -1
 	end
+	return v
 end
 
 function Board:getWidth()
