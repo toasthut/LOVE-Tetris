@@ -3,7 +3,7 @@ local TetShapes = require("class.entity.tetronimo").TetShapes
 local Tetronimo = require("class.entity.tetronimo").Tetronimo
 local Cell = require("class.cell")
 
-local ANIMATION_SPEED = 20
+local ANIMATION_SPEED = 25
 
 ---@class GrabBag
 local GrabBag = Entity:extend()

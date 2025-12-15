@@ -4,9 +4,17 @@ io.stdout:setvbuf("no")
 Object = require("classic")
 util = require("haert.util")
 Audio = require("class.AudioManager")
+Fonts = {
+	default = love.graphics.getFont(),
+	button = love.graphics.newFont(16),
+	gameover = love.graphics.newFont(64),
+}
 
 local Logger = require("class.logger")
-local Tetris = require("class.Tetris")
+---@type Logger
+Log = Logger()
+
+local StateManager = require("class.StateManager")
 
 local LIMIT_FPS = false
 local dt_accum = 0.0
@@ -15,28 +23,16 @@ local min_dt = 1 / targetFPS
 local doDraw = true
 local canvas = love.graphics.newCanvas(2560, 1440)
 
----@type Logger
-Log = Logger()
-
-local controlsText = {
-	"Arrow keys to move",
-	"Z/X to rotate",
-	"LShift to hold",
-}
-
-local function render()
-	Tetris:draw()
-	Log:draw()
-	love.graphics.setColor(1, 1, 1, 1)
-	for i = 1, #controlsText do
-		love.graphics.print(controlsText[i], 10, 10 + 16 * (i - 1))
-	end
-end
-
 local function init()
-	Tetris:new()
+	StateManager:new()
 	love.audio.setVolume(Audio.mainVolume)
 	love.resize()
+end
+
+local function render()
+	StateManager:draw()
+	Log:draw()
+	love.graphics.setColor(1, 1, 1, 1)
 end
 
 function love.load()
@@ -45,7 +41,12 @@ end
 
 ---@param dt number
 function love.update(dt)
-	Tetris:update(dt)
+	if dt > 60 then
+		Log:print("Game took longer than a minute to update. Closing...")
+		love.event.quit()
+	end
+
+	StateManager:update(dt)
 
 	if not LIMIT_FPS then
 		return
@@ -82,16 +83,18 @@ end
 
 ---@param key love.KeyConstant
 function love.keypressed(key)
+	local consumeKey = false
+	consumeKey = StateManager:keypressed(key)
+	if consumeKey then
+		return
+	end
+
 	if key == "`" then
 		Log:toggleVisibility()
 	end
 
-	if key == "r" then
-		if love.keyboard.isDown("lctrl") then
-			love.event.quit("restart")
-		else
-			init()
-		end
+	if key == "r" and love.keyboard.isDown("lctrl") then
+		love.event.quit("restart")
 	end
 
 	if key == "q" then
@@ -101,8 +104,10 @@ end
 
 function love.resize()
 	local w, h = love.graphics.getDimensions()
-	local bw, bh = Tetris.board:getDimensions()
-	Tetris.board:setPosition(w / 2 - bw / 2, h / 2 - bh / 2)
+	if StateManager.board then
+		local bw, bh = StateManager.board:getDimensions()
+		StateManager.board:setPosition(w / 2 - bw / 2, h / 2 - bh / 2)
+	end
 end
 
 ---@alias rotation

@@ -6,6 +6,7 @@ local IntervalCallback = require("class.timer.IntervalCallback")
 local Stopwatch = require("class.timer.Stopwatch")
 local Audio = require("class.AudioManager")
 local Shaker = require("class.animation.Shaker")
+local Keybind = require("class.keybind")
 
 local PALETTE = require("constants").PALETTE
 local LOCK_RESET_LIMIT = 16
@@ -61,8 +62,9 @@ function Board:new()
 
 	self.grabBag = GrabBag()
 	self.holdPiece = nil
-	self.canHold = true
 	self.lowestY = 0
+	self.canHold = true
+	self.gameover = false
 
 	self.lockDelay = Stopwatch()
 	self.lockDelayResets = 0
@@ -82,6 +84,9 @@ function Board:new()
 		holdUI = self:renderHoldUI(),
 		gameover = self:renderGameover(),
 	}
+
+	-- self.keybinds = self:getKeybinds()
+	self.keybinds = {}
 
 	self:spawnPiece(self.grabBag:takePiece(false))
 end
@@ -114,6 +119,10 @@ function Board:spawnPiece(tetronimo)
 end
 
 function Board:update(dt)
+	for i = 1, #self.keybinds do
+		self.keybinds[i]:update(dt)
+	end
+
 	self.fallInterval:update(dt)
 	self.lockDelay:update(dt)
 	self.shaker:update(dt)
@@ -186,7 +195,7 @@ function Board:draw()
 
 			-- Draw active piece & ghost
 			local ghost = self:getGhost()
-			ghost.color = PALETTE.cloud
+			ghost.color = { unpack(PALETTE.cloud) }
 			ghost.color[4] = 0.2
 			ghost:draw()
 			self.activePiece:draw()
@@ -300,7 +309,7 @@ function Board:renderGameover()
 		local text = "GAME OVER"
 		local color = { love.graphics.getColor() }
 		love.graphics.setColor(0.1, 0.1, 0.1)
-		love.graphics.setNewFont(64)
+		love.graphics.setFont(Fonts.gameover)
 		local buh = { 1, -1, 2, -2 }
 		for i = 1, #buh do
 			for j = 1, #buh do
@@ -328,7 +337,7 @@ function Board:renderGameover()
 			love.graphics.getFont():getWidth(text) / 2,
 			love.graphics.getFont():getHeight() / 2
 		)
-		love.graphics.setNewFont()
+		love.graphics.setFont(Fonts.default)
 	end)
 	return c
 end
@@ -627,6 +636,111 @@ function Board:updateGravity()
 	local lvl = math.min(self:getLevel(), 20)
 	local len = GRAVITY_MAGNITUDE[lvl]
 	self.fallInterval:setLength(len)
+end
+
+function Board:getKeybinds()
+	local keybinds = {
+		Keybind("left", function()
+			self:moveActive(-1, 0, true)
+		end, true, nil, { "right" }),
+
+		Keybind("right", function()
+			self:moveActive(1, 0, true)
+		end, true, nil, { "left" }),
+
+		Keybind("down", function()
+			self:softDrop()
+		end, 0, 40),
+
+		Keybind("up", function()
+			self:hardDrop()
+		end),
+
+		Keybind("x", function()
+			self:rotateActive("Clockwise")
+		end),
+
+		Keybind("z", function()
+			self:rotateActive("CounterClockwise")
+		end),
+
+		Keybind("lshift", function()
+			self:swapHoldPiece()
+		end),
+
+		Keybind("r", function()
+			self:new()
+			love.resize()
+		end),
+
+		Keybind("=", function()
+			Audio.volumeUp(0.05)
+			Log:print(Audio.mainVolume)
+		end, 0.65, 15),
+
+		Keybind("-", function()
+			Audio.volumeDown(0.05)
+			Log:print(Audio.mainVolume)
+		end, 0.65, 15),
+	}
+	for i = 1, 9 do
+		local kb = Keybind(tostring(i), function()
+			self:handleLineClear(i)
+		end)
+		table.insert(keybinds, kb)
+	end
+
+	return keybinds
+end
+
+---@param keymap table<string,keybindInfo[]>
+function Board:setKeybinds(keymap)
+	local keybinds = {
+		Keybind(keymap.moveLeft, function()
+			self:moveActive(-1, 0, true)
+		end, true, nil, { "right" }),
+
+		Keybind(keymap.moveRight, function()
+			self:moveActive(1, 0, true)
+		end, true, nil, { "left" }),
+
+		Keybind(keymap.softDrop, function()
+			self:softDrop()
+		end, 0, 40),
+
+		Keybind(keymap.hardDrop, function()
+			self:hardDrop()
+		end),
+
+		Keybind(keymap.rotateCW, function()
+			self:rotateActive("Clockwise")
+		end),
+
+		Keybind(keymap.rotateCCW, function()
+			self:rotateActive("CounterClockwise")
+		end),
+
+		Keybind(keymap.holdPiece, function()
+			self:swapHoldPiece()
+		end),
+
+		-- TODO: fix it !
+		Keybind(keymap.restart, function()
+			self:new()
+			love.resize()
+		end),
+
+		Keybind("=", function()
+			Audio.volumeUp(0.05)
+			Log:print(Audio.mainVolume)
+		end, 0.65, 15),
+
+		Keybind("-", function()
+			Audio.volumeDown(0.05)
+			Log:print(Audio.mainVolume)
+		end, 0.65, 15),
+	}
+	self.keybinds = keybinds
 end
 
 return Board
