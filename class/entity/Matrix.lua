@@ -1,4 +1,4 @@
-local Entity = require("class.entity.entity")
+local Entity = require("class.entity.Entity")
 
 ---@class Matrix: Entity
 ---@field rows number

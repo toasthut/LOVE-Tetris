@@ -1,4 +1,4 @@
-local Entity = require("class.entity.entity")
+local Entity = require("class.entity.Entity")
 local TetShapes = require("class.entity.tetronimo").TetShapes
 local Tetronimo = require("class.entity.tetronimo").Tetronimo
 local Cell = require("class.cell")

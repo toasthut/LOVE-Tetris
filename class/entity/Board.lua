@@ -1,12 +1,12 @@
-local Matrix = require("class.entity.matrix")
-local Cell = require("class.cell")
-local Tetronimo = require("class.entity.tetronimo").Tetronimo
-local GrabBag = require("class.entity.grabBag")
+local Matrix = require("class.entity.Matrix")
+local Cell = require("class.Cell")
+local Tetronimo = require("class.entity.Tetronimo").Tetronimo
+local GrabBag = require("class.entity.GrabBag")
 local IntervalCallback = require("class.timer.IntervalCallback")
 local Stopwatch = require("class.timer.Stopwatch")
 local Audio = require("class.AudioManager")
 local Shaker = require("class.animation.Shaker")
-local Keybind = require("class.keybind")
+local Keybind = require("class.Keybind")
 
 local PALETTE = require("constants").PALETTE
 local LOCK_RESET_LIMIT = 16

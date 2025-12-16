@@ -1,4 +1,4 @@
-local Board = require("class.entity.board")
+local Board = require("class.entity.Board")
 local MainMenu = require("class.menu.MainMenu")
 local KeybindsMenu = require("class.menu.KeybindsMenu")
 local GAME_STATE = require("constants").GAME_STATE
@@ -30,7 +30,6 @@ function StateManager:changeState(state)
 		self.board:new()
 		self.board:setKeybinds(self.keybindsMenu.keymap)
 		love.resize()
-		-- self.dynamicbinds = self.board:getKeybinds()
 	end
 end
 

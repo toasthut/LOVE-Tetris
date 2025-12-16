@@ -1,4 +1,4 @@
-local Matrix = require("class.entity.matrix")
+local Matrix = require("class.entity.Matrix")
 local Cell = require("class.cell")
 local PALETTE = require("constants").PALETTE
 

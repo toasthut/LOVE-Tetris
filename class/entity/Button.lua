@@ -1,4 +1,4 @@
-local Entity = require("class.entity.entity")
+local Entity = require("class.entity.Entity")
 local PALETTE = require("constants").PALETTE
 
 ---@class Button: Entity

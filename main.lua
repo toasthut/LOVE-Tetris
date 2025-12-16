@@ -10,7 +10,7 @@ Fonts = {
 	gameover = love.graphics.newFont(64),
 }
 
-local Logger = require("class.logger")
+local Logger = require("class.Logger")
 ---@type Logger
 Log = Logger()
 
