@@ -1,5 +1,5 @@
 local Matrix = require("class.entity.Matrix")
-local Cell = require("class.cell")
+local Cell = require("class.Cell")
 local PALETTE = require("constants").PALETTE
 
 ---@enum TetShapes

@@ -1,7 +1,7 @@
 local Entity = require("class.entity.Entity")
-local TetShapes = require("class.entity.tetronimo").TetShapes
-local Tetronimo = require("class.entity.tetronimo").Tetronimo
-local Cell = require("class.cell")
+local TetShapes = require("class.entity.Tetronimo").TetShapes
+local Tetronimo = require("class.entity.Tetronimo").Tetronimo
+local Cell = require("class.Cell")
 
 local ANIMATION_SPEED = 25
 
