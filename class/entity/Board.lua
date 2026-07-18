@@ -383,6 +383,9 @@ end
 
 ---@param rot rotation
 function Board:findRotationPosition(rot)
+	if self.activePiece.shape == "O" then
+		return { 0, 0 }
+	end
 	local isValidPosition = true
 	local validKick = false
 
@@ -397,7 +400,12 @@ function Board:findRotationPosition(rot)
 	end)
 
 	local degRotated = t.degreesRotated
-	local kickList = Tetronimo.KICKS[rot][tostring(degRotated)]
+	local kickList
+	if t.shape ~= "I" then
+		kickList = Tetronimo.KICKS[rot][tostring(degRotated)]
+	else
+		kickList = Tetronimo.I_KICKS[rot][tostring(degRotated)]
+	end
 
 	for i = 1, #kickList do
 		isValidPosition = true
@@ -460,8 +468,8 @@ function Board:rotateActive(rot)
 	Audio.sfx.rotate:clone():play()
 
 	-- Check for twists
-	if util.contains({ "O", "I" }, self.activePiece.shape) ~= 0 then
-		return pos
+	if self.activePiece.shape == "O" then
+		return true
 	end
 
 	local isTwist = false
@@ -498,7 +506,7 @@ function Board:rotateActive(rot)
 			self.rotationTheta = -rotationFactor
 		end
 	end
-	return pos
+	return true
 end
 
 ---@param transformFunc function

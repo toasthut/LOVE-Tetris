@@ -207,7 +207,69 @@ function Tetronimo.getKicks(rot, targetDeg)
 	return kicks
 end
 
+---@private
+---@param rot rotation
+---@param targetDeg deg90Interval
+---@return table[]
+function Tetronimo.getIKicks(rot, targetDeg)
+	local kicks = {}
+	-- The default y values in this data have been inverted because in this program,
+	-- a positive y value represents downward movement
+	local kickDefaults = {
+		{ 0, 0 },
+		{ -2, 0 },
+		{ 1, 0 },
+		{ -2, 1 },
+		{ 1, -2 },
+	}
+
+	for i, v in ipairs(kickDefaults) do
+		local x, y = v[1], v[2]
+		if x ~= 0 then
+			if rot == "Clockwise" and math.floor(targetDeg / 180) == 1 then
+				x = x * -1
+			end
+			if rot == "CounterClockwise" and math.ceil(targetDeg / 180) ~= 1 then
+				x = x * -1
+			end
+		end
+
+		if y ~= 0 then
+			if (rot == "Clockwise" and targetDeg % 270 == 0) or (rot == "CounterClockwise" and targetDeg < 180) then
+				y = y * -1
+			end
+		end
+
+		local index = i
+		if (rot == "Clockwise" and targetDeg % 180 == 0) or (rot == "CounterClockwise" and targetDeg % 180 ~= 0) then
+			if i % 2 == 0 then
+				index = i + 1
+			elseif i ~= 1 then
+				index = i - 1
+			end
+		end
+
+		table.insert(kicks, index, { x, y })
+	end
+	return kicks
+end
+
+function Tetronimo.generateIKicks()
+	local rotDirections = { "Clockwise", "CounterClockwise" }
+	local rotDegrees = { 0, 90, 180, 270 }
+	local kicks = {}
+	for _, a in ipairs(rotDirections) do
+		kicks[a] = {}
+		for _, b in ipairs(rotDegrees) do
+			local k = Tetronimo.getIKicks(a, b)
+			kicks[a][tostring(b)] = k
+		end
+	end
+	return kicks
+end
+
 Tetronimo.KICKS = Tetronimo.generateKicks()
+Tetronimo.I_KICKS = Tetronimo.generateIKicks()
 
 return {
 	Tetronimo = Tetronimo,
