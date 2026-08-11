@@ -1,11 +1,12 @@
-local Matrix = require("class.entity.matrix")
-local Cell = require("class.cell")
-local Tetronimo = require("class.entity.tetronimo").Tetronimo
-local GrabBag = require("class.entity.grabBag")
+local Matrix = require("class.entity.Matrix")
+local Cell = require("class.Cell")
+local Tetronimo = require("class.entity.Tetronimo").Tetronimo
+local GrabBag = require("class.entity.GrabBag")
 local IntervalCallback = require("class.timer.IntervalCallback")
 local Stopwatch = require("class.timer.Stopwatch")
 local Audio = require("class.AudioManager")
 local Shaker = require("class.animation.Shaker")
+local Keybind = require("class.Keybind")
 
 local PALETTE = require("constants").PALETTE
 local LOCK_RESET_LIMIT = 16
@@ -48,19 +49,22 @@ end)()
 ---@field shaker Shaker
 ---@field slamOffset number
 ---@field rotationTheta number
+---@field rendered table<string,love.Canvas>
 local Board = Matrix:extend()
 Board.super = Matrix
 
 function Board:new()
 	Board.super.new(self, 20, 10, 0)
+	self.boardCanvas = love.graphics.newCanvas()
 	self.colorMatrix = Matrix(self.rows, self.cols, 0)
 	self.level = 1
 	self.nCleared = 0
 
 	self.grabBag = GrabBag()
 	self.holdPiece = nil
-	self.canHold = true
 	self.lowestY = 0
+	self.canHold = true
+	self.gameover = false
 
 	self.lockDelay = Stopwatch()
 	self.lockDelayResets = 0
@@ -73,7 +77,18 @@ function Board:new()
 	self.slamOffset = 0.0
 	self.rotationTheta = 0.0
 
-	self:spawnPiece(self.grabBag:takePiece())
+	-- Prerender static elements
+	self.rendered = {
+		grid = self:renderGrid(),
+		edges = self:renderEdges(),
+		holdUI = self:renderHoldUI(),
+		gameover = self:renderGameover(),
+	}
+
+	-- self.keybinds = self:getKeybinds()
+	self.keybinds = {}
+
+	self:spawnPiece(self.grabBag:takePiece(false))
 end
 
 ---@param tetronimo Tetronimo
@@ -103,18 +118,15 @@ function Board:spawnPiece(tetronimo)
 	self.lockDelayResets = 0
 end
 
-function Board:getCell(x, y)
-	local v = self.super.getCell(self, x, y)
-	if v == nil then
-		v = -1
-	end
-	return v
-end
-
 function Board:update(dt)
+	for i = 1, #self.keybinds do
+		self.keybinds[i]:update(dt)
+	end
+
 	self.fallInterval:update(dt)
 	self.lockDelay:update(dt)
 	self.shaker:update(dt)
+	self.grabBag:update(dt)
 
 	if self.slamOffset > 0.01 then
 		self.slamOffset = math.max(0, self.slamOffset - self.slamOffset * (7.5 * dt))
@@ -140,8 +152,7 @@ function Board:update(dt)
 end
 
 function Board:draw()
-	local canvas = love.graphics.newCanvas()
-	local left, right, top, bottom = 0, self:getWidth(), 0, self:getHeight()
+	local prevCanvas = love.graphics.getCanvas()
 	do
 		love.graphics.push()
 		love.graphics.translate(self.x, self.y)
@@ -149,7 +160,8 @@ function Board:draw()
 		-- Render main board
 		do
 			love.graphics.push()
-			love.graphics.setCanvas(canvas)
+			love.graphics.setCanvas(self.boardCanvas)
+			love.graphics.clear()
 			love.graphics.translate(0, self.slamOffset)
 			self.shaker:draw()
 
@@ -162,12 +174,10 @@ function Board:draw()
 			love.graphics.rectangle("fill", 0, progressY, self:getWidth(), progressHeight)
 
 			-- Draw grid
-			love.graphics.setColor(0.2, 0.2, 0.2, 1)
-			self:forEach(function(mx, my)
-				local x = (mx - 1) * Cell.SIZE
-				local y = (my - 1) * Cell.SIZE
-				love.graphics.rectangle("line", x, y, Cell.SIZE, Cell.SIZE)
-			end)
+			love.graphics.setColor(1, 1, 1)
+			love.graphics.setBlendMode("alpha", "premultiplied")
+			love.graphics.draw(self.rendered.grid)
+			love.graphics.setBlendMode("alpha")
 
 			-- Draw filled cells
 			self:forEach(function(mx, my, v)
@@ -185,17 +195,18 @@ function Board:draw()
 
 			-- Draw active piece & ghost
 			local ghost = self:getGhost()
-			ghost.color = PALETTE.cloud
+			ghost.color = { unpack(PALETTE.cloud) }
 			ghost.color[4] = 0.2
 			ghost:draw()
 			self.activePiece:draw()
 
 			-- Draw edges
-			love.graphics.setColor(1, 1, 1, 1)
-			love.graphics.line(left, top, left, bottom)
-			love.graphics.line(right, top, right, bottom)
-			love.graphics.line(left, bottom, right, bottom)
-			love.graphics.setCanvas()
+			love.graphics.setColor(1, 1, 1)
+			love.graphics.setBlendMode("alpha", "premultiplied")
+			love.graphics.draw(self.rendered.edges)
+			love.graphics.setBlendMode("alpha")
+
+			love.graphics.setCanvas(prevCanvas)
 			love.graphics.pop()
 		end
 
@@ -207,10 +218,14 @@ function Board:draw()
 		do
 			love.graphics.push()
 			love.graphics.translate(-Cell.SIZE * 6.5, Cell.SIZE * 1)
-			love.graphics.print("HOLD", 0, -20)
 			local w = Cell.SIZE * 5.5
 			local h = Cell.SIZE * 3.5
-			love.graphics.rectangle("line", 0, 0, w, h)
+
+			love.graphics.setColor(1, 1, 1)
+			love.graphics.setBlendMode("alpha", "premultiplied")
+			love.graphics.draw(self.rendered.holdUI, 0, -20)
+			love.graphics.setBlendMode("alpha")
+
 			if self.holdPiece ~= nil then
 				local t = self.holdPiece
 				local x = (w / 2) - (t.cols * Cell.SIZE / 2)
@@ -235,20 +250,66 @@ function Board:draw()
 	-- Draw main board
 	love.graphics.push()
 	love.graphics.setColor(1, 1, 1, 1)
-	love.graphics.setBlendMode("alpha", "premultiplied")
 	local w, h = love.graphics.getDimensions()
 	love.graphics.translate(w / 2, h / 2)
 	love.graphics.rotate(self.rotationTheta)
-	love.graphics.draw(canvas, -w / 2, -h / 2)
+	love.graphics.setBlendMode("alpha", "premultiplied")
+	love.graphics.draw(self.boardCanvas, -w / 2, -h / 2)
 	love.graphics.setBlendMode("alpha")
 	love.graphics.pop()
 
 	-- Draw gameover text
 	if self.gameover then
+		love.graphics.setColor(1, 1, 1)
+		love.graphics.setBlendMode("alpha", "premultiplied")
+		love.graphics.draw(self.rendered.gameover)
+		love.graphics.setBlendMode("alpha")
+	end
+end
+
+function Board:renderGrid()
+	local c = love.graphics.newCanvas()
+	c:renderTo(function()
+		love.graphics.setColor(0.2, 0.2, 0.2, 1)
+		self:forEach(function(mx, my)
+			local x = (mx - 1) * Cell.SIZE
+			local y = (my - 1) * Cell.SIZE
+			love.graphics.rectangle("line", x, y, Cell.SIZE, Cell.SIZE)
+		end)
+	end)
+	return c
+end
+
+function Board:renderEdges()
+	local c = love.graphics.newCanvas()
+	c:renderTo(function()
+		local left, right, top, bottom = 0, self:getWidth(), 0, self:getHeight()
+		love.graphics.setColor(1, 1, 1, 1)
+		love.graphics.line(left, top, left, bottom)
+		love.graphics.line(right, top, right, bottom)
+		love.graphics.line(left, bottom, right, bottom)
+	end)
+	return c
+end
+
+function Board:renderHoldUI()
+	local c = love.graphics.newCanvas()
+	c:renderTo(function()
+		love.graphics.print("HOLD", 0, 0)
+		local w = Cell.SIZE * 5.5
+		local h = Cell.SIZE * 3.5
+		love.graphics.rectangle("line", 0, 20, w, h)
+	end)
+	return c
+end
+
+function Board:renderGameover()
+	local c = love.graphics.newCanvas()
+	c:renderTo(function()
 		local text = "GAME OVER"
 		local color = { love.graphics.getColor() }
 		love.graphics.setColor(0.1, 0.1, 0.1)
-		love.graphics.setNewFont(64)
+		love.graphics.setFont(Fonts.gameover)
 		local buh = { 1, -1, 2, -2 }
 		for i = 1, #buh do
 			for j = 1, #buh do
@@ -276,8 +337,17 @@ function Board:draw()
 			love.graphics.getFont():getWidth(text) / 2,
 			love.graphics.getFont():getHeight() / 2
 		)
-		love.graphics.setNewFont()
+		love.graphics.setFont(Fonts.default)
+	end)
+	return c
+end
+
+function Board:getCell(x, y)
+	local v = self.super.getCell(self, x, y)
+	if v == nil then
+		v = -1
 	end
+	return v
 end
 
 function Board:getWidth()
@@ -313,6 +383,9 @@ end
 
 ---@param rot rotation
 function Board:findRotationPosition(rot)
+	if self.activePiece.shape == "O" then
+		return { 0, 0 }
+	end
 	local isValidPosition = true
 	local validKick = false
 
@@ -327,7 +400,12 @@ function Board:findRotationPosition(rot)
 	end)
 
 	local degRotated = t.degreesRotated
-	local kickList = Tetronimo.KICKS[rot][tostring(degRotated)]
+	local kickList
+	if t.shape ~= "I" then
+		kickList = Tetronimo.KICKS[rot][tostring(degRotated)]
+	else
+		kickList = Tetronimo.I_KICKS[rot][tostring(degRotated)]
+	end
 
 	for i = 1, #kickList do
 		isValidPosition = true
@@ -390,8 +468,8 @@ function Board:rotateActive(rot)
 	Audio.sfx.rotate:clone():play()
 
 	-- Check for twists
-	if util.contains({ "O", "I" }, self.activePiece.shape) ~= 0 then
-		return pos
+	if self.activePiece.shape == "O" then
+		return true
 	end
 
 	local isTwist = false
@@ -428,7 +506,7 @@ function Board:rotateActive(rot)
 			self.rotationTheta = -rotationFactor
 		end
 	end
-	return pos
+	return true
 end
 
 ---@param transformFunc function
@@ -566,6 +644,111 @@ function Board:updateGravity()
 	local lvl = math.min(self:getLevel(), 20)
 	local len = GRAVITY_MAGNITUDE[lvl]
 	self.fallInterval:setLength(len)
+end
+
+function Board:getKeybinds()
+	local keybinds = {
+		Keybind("left", function()
+			self:moveActive(-1, 0, true)
+		end, true, nil, { "right" }),
+
+		Keybind("right", function()
+			self:moveActive(1, 0, true)
+		end, true, nil, { "left" }),
+
+		Keybind("down", function()
+			self:softDrop()
+		end, 0, 40),
+
+		Keybind("up", function()
+			self:hardDrop()
+		end),
+
+		Keybind("x", function()
+			self:rotateActive("Clockwise")
+		end),
+
+		Keybind("z", function()
+			self:rotateActive("CounterClockwise")
+		end),
+
+		Keybind("lshift", function()
+			self:swapHoldPiece()
+		end),
+
+		Keybind("r", function()
+			self:new()
+			love.resize()
+		end),
+
+		Keybind("=", function()
+			Audio.volumeUp(0.05)
+			Log:print(Audio.mainVolume)
+		end, 0.65, 15),
+
+		Keybind("-", function()
+			Audio.volumeDown(0.05)
+			Log:print(Audio.mainVolume)
+		end, 0.65, 15),
+	}
+	for i = 1, 9 do
+		local kb = Keybind(tostring(i), function()
+			self:handleLineClear(i)
+		end)
+		table.insert(keybinds, kb)
+	end
+
+	return keybinds
+end
+
+---@param keymap table<string,keybindInfo[]>
+function Board:setKeybinds(keymap)
+	local keybinds = {
+		Keybind(keymap.moveLeft, function()
+			self:moveActive(-1, 0, true)
+		end, true, nil, { "right" }),
+
+		Keybind(keymap.moveRight, function()
+			self:moveActive(1, 0, true)
+		end, true, nil, { "left" }),
+
+		Keybind(keymap.softDrop, function()
+			self:softDrop()
+		end, 0, 40),
+
+		Keybind(keymap.hardDrop, function()
+			self:hardDrop()
+		end),
+
+		Keybind(keymap.rotateCW, function()
+			self:rotateActive("Clockwise")
+		end),
+
+		Keybind(keymap.rotateCCW, function()
+			self:rotateActive("CounterClockwise")
+		end),
+
+		Keybind(keymap.holdPiece, function()
+			self:swapHoldPiece()
+		end),
+
+		-- TODO: fix it !
+		Keybind(keymap.restart, function()
+			self:new()
+			love.resize()
+		end),
+
+		Keybind("=", function()
+			Audio.volumeUp(0.05)
+			Log:print(Audio.mainVolume)
+		end, 0.65, 15),
+
+		Keybind("-", function()
+			Audio.volumeDown(0.05)
+			Log:print(Audio.mainVolume)
+		end, 0.65, 15),
+	}
+	self.keybinds = keybinds
 end
 
 return Board

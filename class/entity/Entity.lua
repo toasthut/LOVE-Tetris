@@ -22,10 +22,20 @@ function Entity:update(dt) end
 function Entity:draw() end
 
 ---@param x number
+function Entity:setX(x)
+	self.x = x
+end
+
+---@param y number
+function Entity:setY(y)
+	self.y = y
+end
+
+---@param x number
 ---@param y number
 function Entity:setPosition(x, y)
-	self.x = x
-	self.y = y
+	self:setX(x)
+	self:setY(y)
 end
 
 return Entity

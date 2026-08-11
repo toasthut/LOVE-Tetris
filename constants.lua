@@ -17,6 +17,13 @@ local CONST = {
 		peach = util.hexToRGB("#ffe6c6"),
 		cloud = util.hexToRGB("#fff7e4"),
 	},
+	---@enum GAME_STATE
+	GAME_STATE = {
+		mainMenu = 1,
+		settings = 2,
+		ingame = 3,
+		keybinds = 4,
+	},
 }
 
 return CONST
